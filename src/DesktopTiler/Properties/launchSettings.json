@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "DesktopTiler (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "DesktopTiler (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
