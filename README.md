@@ -24,7 +24,7 @@ Tiling is **one-shot, not continuous**: nothing is watched or re-tiled automatic
 
 ### 2. Download
 
-From the [latest release](https://github.com/xmsadik/desktop-tiler-cmdpal/releases/latest) download:
+From the [Releases page](https://github.com/xmsadik/desktop-tiler-cmdpal/releases) (newest release at the top) download:
 - `DesktopTilerDev.cer`
 - the package for your CPU: `DesktopTiler_<version>_x64.msix` (Intel/AMD) or `DesktopTiler_<version>_arm64.msix` (Arm, e.g. Snapdragon). Not sure? Run `$env:PROCESSOR_ARCHITECTURE` in PowerShell: `AMD64` → x64, `ARM64` → arm64.
 
