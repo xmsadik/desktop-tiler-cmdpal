@@ -4,9 +4,9 @@ A PowerToys Command Palette extension for switching virtual desktops and tiling 
 
 > Unofficial community project. Not affiliated with or endorsed by Microsoft.
 
-- **In the Dock:** a *Desktops* band with one button per Windows virtual desktop (`1`, `2`, `3`...), the active one marked `●`, optionally subtitled with the desktop's name. Click a button to switch. Updates live as you switch, add, remove, or rename desktops.
+- **In the Dock:** a *Desktops* band with one button per Windows virtual desktop (`1`, `2`, `3`...), the active one marked `●`, optionally subtitled with the desktop's name. Each button's icon shows whether that desktop has any app windows on it: a filled square if it does, an outlined one if it's empty (minimized windows count). Click a button to switch. Updates live as you switch, add, remove, or rename desktops, and as windows open, close, or move between desktops.
 - **Switch desktops:** `Desktop 1`...`Desktop 9`, `Next desktop`, `Previous desktop` - bind hotkeys to them in Command Palette settings.
-- **Tile windows, once:** `Tile: Master-stack`, `Tile: Columns`, `Tile: Grid`, `Tile: Monocle`, `Tile: Center-master` arrange the tileable windows on the focused monitor into that layout. `Tile: Next layout` cycles through them in that order. `Tile: Retile` re-applies whatever you last tiled with, keeping window order - if you clicked a different window first, that window becomes master. `Tile: Rotate` shifts the remembered window order by one step, so the next window in line becomes master; press it repeatedly until the one you want is in the master (or center) slot.
+- **Tile windows, once:** `Tile: Master-stack`, `Tile: Columns`, `Tile: Grid`, `Tile: Monocle`, `Tile: Center-master` arrange the tileable windows on the focused monitor into that layout. `Tile: Next layout` cycles through them in that order. `Tile: Retile` re-applies whatever you last tiled with, keeping window order - if you clicked a different window first, that window becomes master. `Tile: Rotate` shifts the remembered window order by one step, so the next window in line becomes master; press it repeatedly until the one you want is in the master (or center) slot. After each pass, the layout's name and the result (e.g. **Grid** · *Tiled 4 windows*) flash briefly in the middle of that monitor, on top of the windows just moved; it doesn't take focus and clicks pass through it.
 
 Tiling is **one-shot, not continuous**: nothing is watched or re-tiled automatically. Open or close a window, then press the tile command again. Each pass only touches the monitor of the currently focused window, and only the current virtual desktop; window order is remembered per desktop+monitor for as long as the extension keeps running.
 
@@ -41,7 +41,7 @@ Import-Certificate .\DesktopTilerDev.cer -CertStoreLocation Cert:\LocalMachine\T
 In a normal PowerShell window (or double-click the `.msix` and choose *Install*):
 
 ```powershell
-Add-AppxPackage .\DesktopTiler_0.1.0.0_x64.msix
+Add-AppxPackage .\DesktopTiler_<version>_x64.msix
 ```
 
 ### 5. Show it in the Dock
