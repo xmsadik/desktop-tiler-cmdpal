@@ -15,6 +15,10 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
+    <!-- The UI is English. Without this, the manifest's Language="x-generate" takes the build
+         machine's culture (e.g. tr-TR), and the Store then treats the package as Turkish-only. -->
+    <DefaultLanguage>en-US</DefaultLanguage>
+
     <!-- No full Windows SDK required: CsWinRT reads the OS's own WinMetadata,
          and the packaging tools come from the SDK.BuildTools NuGet package. -->
     <CsWinRTWindowsMetadata>local</CsWinRTWindowsMetadata>
