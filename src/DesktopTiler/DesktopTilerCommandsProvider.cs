@@ -1,6 +1,7 @@
 using System;
 using DesktopTiler.Core.Layouts;
 using DesktopTiler.Core.VirtualDesktops;
+using DesktopTiler.Core.Windows;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
@@ -11,6 +12,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly SettingsManager _settingsManager;
     private readonly VdComClient _vdClient;
     private readonly RegistryDesktopReader _registryReader;
+    private readonly WindowEventWatcher _windowWatcher;
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _tileMemory;
     private readonly DesktopsPage _desktopsPage;
@@ -37,7 +39,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _cycle = new LayoutCycle(() => _settingsManager.DefaultLayout);
         _tileMemory = new TileMemoryStore();
 
-        _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager);
+        _windowWatcher = new WindowEventWatcher();
+        _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
         _dockBand = new WrappedDockItem(_desktopsPage.GetItems(), "DesktopTiler.dock.desktops", "Desktops");
@@ -77,6 +80,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     public override void Dispose()
     {
         _desktopsPage.Dispose();
+        _windowWatcher.Dispose();
         _registryReader.Dispose();
         _vdClient.Dispose();
         base.Dispose();

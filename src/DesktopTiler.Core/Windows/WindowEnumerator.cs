@@ -18,8 +18,10 @@ public static class WindowEnumerator
     public const string CmdPalImageName = "Microsoft.CmdPal.UI.exe";
 
     /// <summary>All top-level windows, front (foreground-most) to back - the order
-    /// <c>EnumWindows</c> returns them in, which matches Z-order.</summary>
-    public static IReadOnlyList<WindowDescriptor> EnumerateZOrder(Func<nint, bool> isOnCurrentVirtualDesktop)
+    /// <c>EnumWindows</c> returns them in, which matches Z-order. A null
+    /// <paramref name="isOnCurrentVirtualDesktop"/> skips that per-window COM call entirely and
+    /// reports every window as not on the current desktop, for callers that don't need it.</summary>
+    public static IReadOnlyList<WindowDescriptor> EnumerateZOrder(Func<nint, bool>? isOnCurrentVirtualDesktop)
     {
         var handles = new List<nint>();
         NativeMethods.EnumWindows(
@@ -45,7 +47,7 @@ public static class WindowEnumerator
         return h == 0 ? null : Describe(h, isOnCurrentVirtualDesktop);
     }
 
-    private static WindowDescriptor Describe(nint h, Func<nint, bool> isOnCurrentVirtualDesktop)
+    private static WindowDescriptor Describe(nint h, Func<nint, bool>? isOnCurrentVirtualDesktop)
     {
         NativeMethods.GetWindowThreadProcessId(h, out var pid);
         var exStyle = NativeMethods.GetWindowLong(h, NativeMethods.GwlExStyle);
@@ -64,7 +66,7 @@ public static class WindowEnumerator
             IsHung: NativeMethods.IsHungAppWindow(h),
             HasThickFrame: (style & NativeMethods.WsThickFrame) != 0,
             HasTitle: NativeMethods.GetWindowTextLengthW(h) > 0,
-            IsOnCurrentVirtualDesktop: SafeIsOnCurrentDesktop(h, isOnCurrentVirtualDesktop),
+            IsOnCurrentVirtualDesktop: isOnCurrentVirtualDesktop is not null && SafeIsOnCurrentDesktop(h, isOnCurrentVirtualDesktop),
             MonitorHandle: NativeMethods.MonitorFromWindow(h, NativeMethods.MonitorDefaultToNearest));
     }
 

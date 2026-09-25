@@ -114,6 +114,15 @@ public sealed class VdComClient : IDisposable
 
     public Task<bool> IsWindowOnCurrentVirtualDesktopAsync(nint hwnd) => RunAsync(() => IsOnCurrentCore(hwnd));
 
+    /// <summary>The desktop id of each of <paramref name="hwnds"/> (same order), all in a single
+    /// STA hop. A window whose id can't be read (e.g. it closed mid-query) gets
+    /// <see cref="Guid.Empty"/> rather than failing the whole batch.</summary>
+    public Task<IReadOnlyList<Guid>> GetWindowDesktopIdsAsync(IReadOnlyList<nint> hwnds)
+    {
+        ArgumentNullException.ThrowIfNull(hwnds);
+        return RunAsync<IReadOnlyList<Guid>>(() => GetWindowDesktopIdsCore(hwnds));
+    }
+
     public void Dispose()
     {
         // Interlocked, not "if (_queue.IsAddingCompleted)": two racing Dispose() calls must not
@@ -339,6 +348,27 @@ public sealed class VdComClient : IDisposable
         var hr = _publicVdm!.IsWindowOnCurrentVirtualDesktop(hwnd, out var onCurrent);
         ThrowIfFailed(hr, "IsWindowOnCurrentVirtualDesktop");
         return onCurrent;
+    }
+
+    private Guid[] GetWindowDesktopIdsCore(IReadOnlyList<nint> hwnds)
+    {
+        EnsurePublicConnected();
+
+        var ids = new Guid[hwnds.Count];
+        for (var i = 0; i < hwnds.Count; i++)
+        {
+            var hr = _publicVdm!.GetWindowDesktopId(hwnds[i], out var id);
+            if (IsReconnectable(hr) || hr == ENointerface || hr == RegDbEClassNotReg)
+            {
+                // Not a per-window problem: Explorer restarted or the interface is gone - throw so
+                // RunAsync's reconnect/unsupported-build handling applies to the whole batch.
+                ThrowIfFailed(hr, "GetWindowDesktopId");
+            }
+
+            ids[i] = hr >= 0 ? id : Guid.Empty;
+        }
+
+        return ids;
     }
 
     private IEnumerable<(IVirtualDesktop Desktop, Guid Id)> EnumerateDesktops()
