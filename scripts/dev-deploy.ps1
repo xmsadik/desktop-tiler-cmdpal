@@ -18,12 +18,16 @@ param(
 $ErrorActionPreference = 'Stop'
 $project = Join-Path $PSScriptRoot '..\src\DesktopTiler\DesktopTiler.csproj'
 
-$existing = Get-AppxPackage -Name 'DesktopTiler'
+# 'DesktopTiler' is the pre-Store identity (v0.1-v0.2); it registers the same COM class, so it
+# must not stay installed next to the current one.
+$existing = @(Get-AppxPackage -Name 'ABAPer.DesktopTiler') + @(Get-AppxPackage -Name 'DesktopTiler')
 if ($existing) {
   # The host keeps the COM server alive; stop it so the files can be replaced.
   Get-Process -Name 'DesktopTiler' -ErrorAction SilentlyContinue | Stop-Process -Force
-  Remove-AppxPackage -Package $existing.PackageFullName
-  Write-Host "Removed $($existing.PackageFullName)"
+  foreach ($package in $existing) {
+    Remove-AppxPackage -Package $package.PackageFullName
+    Write-Host "Removed $($package.PackageFullName)"
+  }
 }
 if ($Remove) { return }
 
@@ -32,5 +36,5 @@ if ($LASTEXITCODE -ne 0) { throw "Build failed ($LASTEXITCODE)" }
 
 $manifest = Join-Path $PSScriptRoot "..\src\DesktopTiler\bin\x64\$Configuration\net10.0-windows10.0.26100.0\win-x64\AppxManifest.xml"
 Add-AppxPackage -Register (Resolve-Path $manifest)
-Get-AppxPackage -Name 'DesktopTiler' | Select-Object Name, Version, InstallLocation
+Get-AppxPackage -Name 'ABAPer.DesktopTiler' | Select-Object Name, Version, InstallLocation
 Write-Host 'Deployed. In Command Palette, run "Reload" to load the new build.'

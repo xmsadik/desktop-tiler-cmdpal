@@ -22,10 +22,12 @@ Tiling is **one-shot, not continuous**: nothing is watched or re-tiled automatic
 1. Install or update [PowerToys](https://github.com/microsoft/PowerToys/releases) and make sure **Command Palette** is enabled in PowerToys Settings.
 2. Open Command Palette (default <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd>) → **Settings** → **Dock (Preview)** → turn on **Enable Dock**.
 
+> **Upgrading from v0.1 or v0.2?** Those used a different package identity. Remove them first (`Get-AppxPackage DesktopTiler | Remove-AppxPackage`), then install as below. Your settings reset to their defaults.
+
 ### 2. Download
 
 From the [Releases page](https://github.com/xmsadik/desktop-tiler-cmdpal/releases) (newest release at the top) download:
-- `DesktopTilerDev.cer`
+- `DesktopTiler.cer`
 - the package for your CPU: `DesktopTiler_<version>_x64.msix` (Intel/AMD) or `DesktopTiler_<version>_arm64.msix` (Arm, e.g. Snapdragon). Not sure? Run `$env:PROCESSOR_ARCHITECTURE` in PowerShell: `AMD64` → x64, `ARM64` → arm64.
 
 ### 3. Trust the certificate (once per machine)
@@ -33,7 +35,7 @@ From the [Releases page](https://github.com/xmsadik/desktop-tiler-cmdpal/release
 The package is signed with a self-signed certificate, so Windows has to be told to trust it. In **PowerShell as Administrator**, in the download folder:
 
 ```powershell
-Import-Certificate .\DesktopTilerDev.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+Import-Certificate .\DesktopTiler.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
 ```
 
 ### 4. Install
@@ -57,9 +59,9 @@ Download the newer `.msix` and run `Add-AppxPackage` again; the certificate step
 ### Uninstall
 
 ```powershell
-Get-AppxPackage DesktopTiler | Remove-AppxPackage
+Get-AppxPackage ABAPer.DesktopTiler | Remove-AppxPackage
 # optional, as Administrator: remove the trusted certificate
-Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=DesktopTilerDev' | Remove-Item
+Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=48947E55-115C-445B-9841-39A5BCF271DD' | Remove-Item
 ```
 
 ### Troubleshooting
@@ -67,7 +69,7 @@ Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=De
 | Symptom | Fix |
 |---|---|
 | `0x800B0109` / "the root certificate … is not trusted" on install | Step 3 was skipped or not run as Administrator. |
-| `0x80073CFB` / "a package with the same identity is already installed" | A development build is registered: `Get-AppxPackage DesktopTiler \| Remove-AppxPackage`, then install again. |
+| `0x80073CFB` / "a package with the same identity is already installed" | A development build is registered: `Get-AppxPackage ABAPer.DesktopTiler \| Remove-AppxPackage`, then install again. |
 | Band doesn't appear | Check **Enable Dock** is on, run **Reload**, then use **Pin to Dock** as in step 5. |
 | Toast says "Unsupported Windows build for desktop switching" | Your Windows build's undocumented virtual-desktop COM layout doesn't match what this extension expects - see [Limitations](#limitations). Wait for an update, or check the project's issues. |
 | A window is reported "skipped (admin)" | The window belongs to an elevated (Run as administrator) process; a non-elevated extension can't move it - see [Limitations](#limitations). |
@@ -137,10 +139,11 @@ After deploying, run **Reload** in Command Palette. If the band does not appear 
 ### MSIX package
 
 ```powershell
-.\scripts\pack.ps1 -Sign        # dist\...\DesktopTiler_<ver>_x64.msix + dist\DesktopTilerDev.cer
+.\scripts\pack.ps1 -Sign        # dist\...\DesktopTiler_<ver>_x64.msix + dist\DesktopTiler.cer
+.\scripts\pack-store.ps1       # dist\store\DesktopTiler_<ver>_Bundle.msixbundle (unsigned, x64 + ARM64, for Partner Center)
 ```
 
-`-Platform ARM64` builds the Arm package. The first `-Sign` run creates a self-signed `CN=DesktopTilerDev` code-signing certificate in `Cert:\CurrentUser\My` and reuses it afterwards. Install the result as described in [Installation](#installation).
+`-Platform ARM64` builds the Arm package. The first `-Sign` run creates a self-signed code-signing certificate for the manifest's publisher in `Cert:\CurrentUser\My` and reuses it afterwards. `scripts/make-icons.py` (needs Pillow) regenerates every image in `src/DesktopTiler/Assets`. Install the result as described in [Installation](#installation).
 
 ## Layout
 
@@ -158,6 +161,10 @@ These are Command Palette bugs, not bugs in this extension:
 - [#49688](https://github.com/microsoft/PowerToys/issues/49688): bands stop repainting after roughly 41 hours of uptime.
 
 Running **Reload** in Command Palette works around both.
+
+## Privacy
+
+Desktop Tiler has no network access and collects no data. See [PRIVACY.md](PRIVACY.md).
 
 ## License
 

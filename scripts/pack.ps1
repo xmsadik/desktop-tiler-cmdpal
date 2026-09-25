@@ -4,12 +4,13 @@
 
 .DESCRIPTION
   Output goes to dist\. Without -Sign the package is unsigned and only useful for
-  inspection. With -Sign, a code-signing certificate whose subject matches the
-  manifest Publisher (CN=DesktopTilerDev) is created in CurrentUser\My on first use,
-  its public part is exported to dist\DesktopTilerDev.cer, and the MSIX is signed.
+  inspection. With -Sign, a self-signed code-signing certificate whose subject matches the
+  manifest Publisher (the Partner Center publisher id) is created in CurrentUser\My on first
+  use, its public part is exported to dist\DesktopTiler.cer, and the MSIX is signed. Microsoft
+  Store builds are unsigned instead (see pack-store.ps1): the Store signs them itself.
 
   To install a self-signed package, the target machine must trust the .cer once
-  (elevated):  Import-Certificate dist\DesktopTilerDev.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+  (elevated):  Import-Certificate dist\DesktopTiler.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
 
 .PARAMETER Platform
   x64 or ARM64.
@@ -24,7 +25,8 @@ $ErrorActionPreference = 'Stop'
 $root    = Resolve-Path (Join-Path $PSScriptRoot '..')
 $project = Join-Path $root 'src\DesktopTiler\DesktopTiler.csproj'
 $dist    = Join-Path $root 'dist'
-$subject = 'CN=DesktopTilerDev'
+[xml]$manifestXml = Get-Content (Join-Path $root 'src\DesktopTiler\Package.appxmanifest')
+$subject = $manifestXml.Package.Identity.Publisher
 
 # A trailing backslash immediately before the closing quote (-p:AppxPackageDir="$dist\") breaks
 # once $dist contains a space: Windows argv parsing treats \" as an escaped literal quote, not
@@ -48,7 +50,7 @@ if ($Sign) {
       -TextExtension @('2.5.29.19={text}')
     Write-Host "Created signing certificate $($cert.Thumbprint)"
   }
-  Export-Certificate -Cert $cert -FilePath (Join-Path $dist 'DesktopTilerDev.cer') | Out-Null
+  Export-Certificate -Cert $cert -FilePath (Join-Path $dist 'DesktopTiler.cer') | Out-Null
 
   $signtool = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.windows.sdk.buildtools" -Recurse -Filter signtool.exe |
     Where-Object { $_.DirectoryName -like '*\x64' } | Select-Object -First 1

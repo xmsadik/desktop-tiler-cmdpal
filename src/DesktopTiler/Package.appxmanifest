@@ -10,13 +10,13 @@
   IgnorableNamespaces="uap uap3 rescap desktop6">
 
   <Identity
-    Name="DesktopTiler"
-    Publisher="CN=DesktopTilerDev"
-    Version="0.2.0.0" />
+    Name="ABAPer.DesktopTiler"
+    Publisher="CN=48947E55-115C-445B-9841-39A5BCF271DD"
+    Version="0.3.0.0" />
 
   <Properties>
     <DisplayName>Desktop Tiler</DisplayName>
-    <PublisherDisplayName>Desktop Tiler</PublisherDisplayName>
+    <PublisherDisplayName>ABAPer</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
   </Properties>
@@ -40,7 +40,10 @@
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square71x71Logo="Assets\SmallTile.png"
+          Square310x310Logo="Assets\LargeTile.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
       <Extensions>
