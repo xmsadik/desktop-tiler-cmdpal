@@ -10,22 +10,24 @@ namespace DesktopTiler;
 /// Passes <see cref="LayoutCycle.Advance"/> itself as Tiler's kind-selector, so the read-advance-
 /// record happens under Tiler's own tiling lock alongside the actual tile/window-order-memory
 /// work - two overlapping invocations of this command can't both read the same "last" layout
-/// before either records. The toast is prefixed with the layout name (e.g. "Grid · Tiled 4
-/// windows") since, unlike the fixed-layout commands, the user doesn't otherwise know which
-/// layout just ran.</summary>
+/// before either records. The resulting layout's name is shown on the <see cref="LayoutOsd"/>
+/// (see <see cref="TileResultFormatter.ToCommandResult"/>), since the user doesn't otherwise know
+/// which layout just ran.</summary>
 internal sealed partial class NextLayoutCommand : InvokableCommand
 {
     private readonly VdComClient _vdClient;
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _memoryStore;
     private readonly SettingsManager _settingsManager;
+    private readonly LayoutOsd _osd;
 
-    public NextLayoutCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager)
+    public NextLayoutCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager, LayoutOsd osd)
     {
         _vdClient = vdClient;
         _cycle = cycle;
         _memoryStore = memoryStore;
         _settingsManager = settingsManager;
+        _osd = osd;
         Id = "DesktopTiler.tile.next";
         Name = "Tile: Next layout";
         Icon = new IconInfo("");
@@ -40,7 +42,7 @@ internal sealed partial class NextLayoutCommand : InvokableCommand
             // Gap/master ratio are read from SettingsManager here, at invoke time, so a settings
             // change takes effect on the very next tile.
             var outcome = Tiler.Tile(_vdClient, _cycle.Advance, _memoryStore, gap: _settingsManager.Gap, masterRatio: _settingsManager.MasterRatio);
-            return CommandResult.ShowToast(TileResultFormatter.Format(outcome.Result, LayoutDisplayNames.For(outcome.Kind)));
+            return TileResultFormatter.ToCommandResult(outcome, _osd);
         }
         catch (UnsupportedBuildException)
         {

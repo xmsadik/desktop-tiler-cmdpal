@@ -1,5 +1,6 @@
 using System.Globalization;
 using DesktopTiler.Core.Windows;
+using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace DesktopTiler;
 
@@ -9,6 +10,24 @@ namespace DesktopTiler;
 internal static class TileResultFormatter
 {
     public static string Format(TileResult result) => Format(result, prefix: null);
+
+    /// <summary>The command result for a finished tiling pass, shared by every "Tile: *" command.
+    /// If windows were actually moved, the layout name and result go on the topmost
+    /// <see cref="LayoutOsd"/> (the host's toast would end up behind the windows just moved) and
+    /// the palette is dismissed; otherwise - nothing tiled, so nothing covers it, or the OSD
+    /// couldn't be shown - the toast is kept.</summary>
+    public static CommandResult ToCommandResult(TileOutcome outcome, LayoutOsd osd)
+    {
+        var layoutName = LayoutDisplayNames.For(outcome.Kind);
+        if (outcome.WorkArea is { } workArea
+            && outcome.Result.Tiled > 0
+            && osd.Show(layoutName, Format(outcome.Result), workArea))
+        {
+            return CommandResult.Dismiss();
+        }
+
+        return CommandResult.ShowToast(Format(outcome.Result, layoutName));
+    }
 
     /// <summary>Same formatting, with an optional prefix (e.g. the layout name for "Tile: Next
     /// layout", since that command doesn't otherwise tell the user which layout just ran)

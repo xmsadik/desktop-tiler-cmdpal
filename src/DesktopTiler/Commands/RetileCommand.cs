@@ -16,13 +16,15 @@ internal sealed partial class RetileCommand : InvokableCommand
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _memoryStore;
     private readonly SettingsManager _settingsManager;
+    private readonly LayoutOsd _osd;
 
-    public RetileCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager)
+    public RetileCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager, LayoutOsd osd)
     {
         _vdClient = vdClient;
         _cycle = cycle;
         _memoryStore = memoryStore;
         _settingsManager = settingsManager;
+        _osd = osd;
         Id = "DesktopTiler.tile.retile";
         Name = "Tile: Retile";
         Icon = new IconInfo("");
@@ -37,7 +39,7 @@ internal sealed partial class RetileCommand : InvokableCommand
             // Gap/master ratio are read from SettingsManager here, at invoke time, so a settings
             // change takes effect on the very next tile.
             var outcome = Tiler.Tile(_vdClient, SelectAndRecordKind, _memoryStore, gap: _settingsManager.Gap, masterRatio: _settingsManager.MasterRatio);
-            return CommandResult.ShowToast(TileResultFormatter.Format(outcome.Result));
+            return TileResultFormatter.ToCommandResult(outcome, _osd);
         }
         catch (UnsupportedBuildException)
         {

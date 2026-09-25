@@ -13,6 +13,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly VdComClient _vdClient;
     private readonly RegistryDesktopReader _registryReader;
     private readonly WindowEventWatcher _windowWatcher;
+    private readonly LayoutOsd _osd;
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _tileMemory;
     private readonly DesktopsPage _desktopsPage;
@@ -38,6 +39,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         // takes effect immediately for any session where nothing has been tiled yet.
         _cycle = new LayoutCycle(() => _settingsManager.DefaultLayout);
         _tileMemory = new TileMemoryStore();
+        _osd = new LayoutOsd();
 
         _windowWatcher = new WindowEventWatcher();
         _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher);
@@ -59,14 +61,14 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(new DesktopNumberCommand(_vdClient, _registryReader, 9)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, +1)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, -1)),
-            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
-            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
-            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
-            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, LayoutKind.Monocle, "DesktopTiler.tile.monocle", "Tile: Monocle")),
-            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, LayoutKind.CenterMaster, "DesktopTiler.tile.centermaster", "Tile: Center-master")),
-            new CommandItem(new NextLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager)),
-            new CommandItem(new RetileCommand(_vdClient, _cycle, _tileMemory, _settingsManager)),
-            new CommandItem(new RotateCommand(_vdClient, _cycle, _tileMemory, _settingsManager)),
+            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
+            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
+            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
+            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Monocle, "DesktopTiler.tile.monocle", "Tile: Monocle")),
+            new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.CenterMaster, "DesktopTiler.tile.centermaster", "Tile: Center-master")),
+            new CommandItem(new NextLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd)),
+            new CommandItem(new RetileCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd)),
+            new CommandItem(new RotateCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd)),
             new CommandItem(_settingsManager.Settings.SettingsPage) { Title = "Desktop Tiler settings" },
         ];
 
@@ -81,6 +83,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     {
         _desktopsPage.Dispose();
         _windowWatcher.Dispose();
+        _osd.Dispose();
         _registryReader.Dispose();
         _vdClient.Dispose();
         base.Dispose();

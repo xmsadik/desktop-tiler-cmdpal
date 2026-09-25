@@ -13,6 +13,7 @@
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <!-- No full Windows SDK required: CsWinRT reads the OS's own WinMetadata,
          and the packaging tools come from the SDK.BuildTools NuGet package. -->

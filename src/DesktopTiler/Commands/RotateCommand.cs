@@ -11,21 +11,23 @@ namespace DesktopTiler;
 /// whatever was at index 1 becomes the new master (see <see cref="WindowOrder"/>, applied via
 /// <c>Tiler.Tile</c>'s <c>rotate</c> parameter). Unlike <see cref="RetileCommand"/>, the point
 /// here isn't re-running a layout - it's cycling *who's master* without picking a different one.
-/// The toast is prefixed with the layout name, same as <see cref="NextLayoutCommand"/>, since the
-/// user doesn't otherwise know which layout it just re-ran.</summary>
+/// The layout name is shown on the <see cref="LayoutOsd"/>, same as <see cref="NextLayoutCommand"/>,
+/// since the user doesn't otherwise know which layout it just re-ran.</summary>
 internal sealed partial class RotateCommand : InvokableCommand
 {
     private readonly VdComClient _vdClient;
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _memoryStore;
     private readonly SettingsManager _settingsManager;
+    private readonly LayoutOsd _osd;
 
-    public RotateCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager)
+    public RotateCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager, LayoutOsd osd)
     {
         _vdClient = vdClient;
         _cycle = cycle;
         _memoryStore = memoryStore;
         _settingsManager = settingsManager;
+        _osd = osd;
         Id = "DesktopTiler.tile.rotate";
         Name = "Tile: Rotate";
         Icon = new IconInfo("");
@@ -40,7 +42,7 @@ internal sealed partial class RotateCommand : InvokableCommand
             // Gap/master ratio are read from SettingsManager here, at invoke time, so a settings
             // change takes effect on the very next tile.
             var outcome = Tiler.Tile(_vdClient, SelectAndRecordKind, _memoryStore, rotate: true, gap: _settingsManager.Gap, masterRatio: _settingsManager.MasterRatio);
-            return CommandResult.ShowToast(TileResultFormatter.Format(outcome.Result, LayoutDisplayNames.For(outcome.Kind)));
+            return TileResultFormatter.ToCommandResult(outcome, _osd);
         }
         catch (UnsupportedBuildException)
         {

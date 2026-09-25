@@ -16,14 +16,16 @@ internal sealed partial class TileLayoutCommand : InvokableCommand
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _memoryStore;
     private readonly SettingsManager _settingsManager;
+    private readonly LayoutOsd _osd;
     private readonly LayoutKind _kind;
 
-    public TileLayoutCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager, LayoutKind kind, string id, string name)
+    public TileLayoutCommand(VdComClient vdClient, LayoutCycle cycle, TileMemoryStore memoryStore, SettingsManager settingsManager, LayoutOsd osd, LayoutKind kind, string id, string name)
     {
         _vdClient = vdClient;
         _cycle = cycle;
         _memoryStore = memoryStore;
         _settingsManager = settingsManager;
+        _osd = osd;
         _kind = kind;
         Id = id;
         Name = name;
@@ -47,7 +49,7 @@ internal sealed partial class TileLayoutCommand : InvokableCommand
                 _memoryStore,
                 gap: _settingsManager.Gap,
                 masterRatio: _settingsManager.MasterRatio);
-            return CommandResult.ShowToast(TileResultFormatter.Format(outcome.Result));
+            return TileResultFormatter.ToCommandResult(outcome, _osd);
         }
         catch (UnsupportedBuildException)
         {

@@ -7,10 +7,11 @@ using DesktopTiler.Core.Windows;
 
 namespace DesktopTiler;
 
-/// <summary>Result of one <see cref="Tiler.Tile"/> call: the move/maximize outcome plus which
-/// <see cref="LayoutKind"/> <paramref name="Kind"/> was actually used, for commands (Next/Retile/
-/// Rotate) whose layout is chosen dynamically and whose toast needs to name it.</summary>
-internal readonly record struct TileOutcome(TileResult Result, LayoutKind Kind);
+/// <summary>Result of one <see cref="Tiler.Tile"/> call: the move/maximize outcome, which
+/// <see cref="LayoutKind"/> <paramref name="Kind"/> was actually used (Next/Retile/Rotate choose it
+/// dynamically), and the work area of the monitor that was tiled - null if nothing was, e.g. no
+/// tileable window - so the layout OSD can be centered on it.</summary>
+internal readonly record struct TileOutcome(TileResult Result, LayoutKind Kind, Rect? WorkArea = null);
 
 /// <summary>
 /// Ties the Core pieces together for a single "tile now" pass: decide (and record) which layout
@@ -63,7 +64,7 @@ internal static class Tiler
 
             memoryStore.Record(g.DesktopId, g.Target.MonitorHandle, new TileMemory(g.Target.MonitorHandle, orderedIds, targetId));
 
-            return new TileOutcome(result, kind);
+            return new TileOutcome(result, kind, g.WorkArea);
         }
     }
 
