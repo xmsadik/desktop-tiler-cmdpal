@@ -6,19 +6,17 @@
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
-  IgnorableNamespaces="uap uap3 rescap desktop6">
+  IgnorableNamespaces="uap uap3 rescap">
 
   <Identity
     Name="ABAPer.DesktopTiler"
     Publisher="CN=48947E55-115C-445B-9841-39A5BCF271DD"
-    Version="0.3.0.0" />
+    Version="0.3.1.0" />
 
   <Properties>
     <DisplayName>Desktop Tiler</DisplayName>
     <PublisherDisplayName>ABAPer</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
   </Properties>
 
   <Dependencies>
@@ -78,6 +76,5 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
-    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>

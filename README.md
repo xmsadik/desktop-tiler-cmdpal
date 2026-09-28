@@ -122,7 +122,6 @@ Command Palette → *Desktop Tiler* → *Settings*:
 - An elevated (Run as administrator) window can't be moved from this extension's non-elevated process; it's reported as "skipped (admin)" instead of tiled.
 - Each tile pass only arranges windows on a single monitor - the one the focused window is on.
 - A window with a large minimum size may not fully fit its assigned cell and can overflow it.
-- The package declares the restricted `unvirtualizedResources` capability so that registry change notifications for the virtual desktop list (which live outside the app's virtualized registry view) actually reach the extension.
 
 ## Build from source
 

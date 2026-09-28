@@ -5,9 +5,8 @@ namespace DesktopTiler.Core.VirtualDesktops;
 
 /// <summary>
 /// Coalesces a burst of rapid <see cref="Signal"/> calls into a single delayed invocation of the
-/// callback - e.g. Explorer writes several <c>VirtualDesktops</c> registry values per desktop
-/// switch, and each write re-arms <see cref="RegistryDesktopReader"/>'s watch, but subscribers
-/// only need to be told once per burst. Built on <see cref="TimeProvider"/> (rather than a raw
+/// callback - e.g. opening one app raises several show/cloak WinEvents, but subscribers only
+/// need to be told once per burst. Built on <see cref="TimeProvider"/> (rather than a raw
 /// <see cref="Timer"/>) so the scheduling can be swapped out for a fake in unit tests.
 /// </summary>
 public sealed class Debouncer : IDisposable

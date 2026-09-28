@@ -55,7 +55,7 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
         _windowWatcher.Changed += OnWindowsChanged;
     }
 
-    /// <summary>Raised whenever the item set has changed (registry watcher fired, a switch we just
+    /// <summary>Raised whenever the item set has changed (registry poll saw a change, a switch we just
     /// performed, or the "Show desktop names" setting changed), in addition to the standard
     /// RaiseItemsChanged.</summary>
     public event EventHandler? Refreshed;
@@ -180,7 +180,7 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
     }
 
     /// <summary>Raises <see cref="RaiseItemsChanged"/> and <see cref="Refreshed"/>. Called from the
-    /// registry watcher's debounce timer thread (<see cref="OnRegistryChanged"/>) as well as
+    /// registry poll thread (<see cref="OnRegistryChanged"/>) as well as
     /// straight off a command invocation (<see cref="NotifyAfterSwitch"/>); either way, an
     /// exception here (ours, a subscriber's, e.g. the provider re-reading items for the Dock band)
     /// must not crash the host - it's logged to SpikeLog and swallowed instead.</summary>
