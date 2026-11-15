@@ -124,6 +124,10 @@ public static class WindowEnumerator
         }
     }
 
+    /// <summary>Asks the window to close, exactly like its title-bar close button (WM_CLOSE):
+    /// the app may still prompt to save. Returns false if the message couldn't be posted.</summary>
+    public static bool RequestClose(nint h) => NativeMethods.PostMessage(h, NativeMethods.WmClose, 0, 0);
+
     /// <summary>Full path of the executable that owns process <paramref name="pid"/>, or empty if
     /// it can't be read (elevated/protected process, or it exited).</summary>
     public static string GetImagePath(int pid) => TryGetImagePath(pid);

@@ -67,22 +67,4 @@ public class DesktopOccupancyTests
     [InlineData("Shell_TrayWnd")]
     public void IsAppWindow_ShellWindow_ReturnsFalse(string className) =>
         Assert.False(IsApp(App(className: className)));
-
-    [Fact]
-    public void OccupiedDesktops_DistinctIdsCollected_EmptyIgnored()
-    {
-        var a = Guid.NewGuid();
-        var b = Guid.NewGuid();
-
-        var occupied = DesktopOccupancy.OccupiedDesktops([a, Guid.Empty, a, b]);
-
-        Assert.Equal(2, occupied.Count);
-        Assert.Contains(a, occupied);
-        Assert.Contains(b, occupied);
-        Assert.DoesNotContain(Guid.Empty, occupied);
-    }
-
-    [Fact]
-    public void OccupiedDesktops_NoWindows_ReturnsEmptySet() =>
-        Assert.Empty(DesktopOccupancy.OccupiedDesktops([]));
 }

@@ -62,6 +62,7 @@ public sealed class VdComClient : IDisposable
     private ExceptionDispatchInfo? _initError;
     private IVirtualDesktopManagerInternal? _vdmi;
     private IVirtualDesktopManager? _publicVdm;
+    private IApplicationViewCollection? _views;
     private volatile bool _useAnimation;
     private int _disposed;
 
@@ -121,6 +122,17 @@ public sealed class VdComClient : IDisposable
     public Task ActivateWindowAsync(Guid? desktopId, nint window, bool animate) => RunAsync(() =>
     {
         ActivateWindowCore(desktopId, window, animate);
+        return true;
+    });
+
+    /// <summary>Moves <paramref name="window"/> (any process's) to desktop
+    /// <paramref name="desktopId"/>; the current desktop doesn't change. Throws
+    /// <see cref="NotSupportedException"/> if this Windows build doesn't expose the view
+    /// collection needed for that, and a COMException (typically E_ACCESSDENIED) for a window
+    /// that can't be moved, e.g. an elevated one.</summary>
+    public Task MoveWindowAsync(nint window, Guid desktopId) => RunAsync(() =>
+    {
+        MoveWindowCore(window, desktopId);
         return true;
     });
 
@@ -257,6 +269,11 @@ public sealed class VdComClient : IDisposable
 
         ThrowIfConnectFailed(hr, "QueryService(IVirtualDesktopManagerInternal)");
         _vdmi = vdmi ?? throw new InvalidOperationException("QueryService returned S_OK but a null IVirtualDesktopManagerInternal.");
+
+        // Only needed to move windows between desktops; a failure here leaves _views null and
+        // makes just that feature unavailable (MoveWindowAsync throws NotSupportedException).
+        hr = ((IServiceProviderRaw)(object)shell).QueryService(typeof(IApplicationViewCollection).GUID, typeof(IApplicationViewCollection).GUID, out var viewsPtr);
+        _views = hr >= 0 && viewsPtr != 0 ? WrapAndRelease<IApplicationViewCollection>(viewsPtr) : null;
     }
 
     /// <summary>Connects the public, documented IVirtualDesktopManager if it isn't already, on this
@@ -321,6 +338,33 @@ public sealed class VdComClient : IDisposable
         finally
         {
             ForegroundParking.Release(parked);
+        }
+    }
+
+    private void MoveWindowCore(nint window, Guid desktopId)
+    {
+        EnsureInternalConnected();
+        if (_views is null)
+        {
+            throw new NotSupportedException("Moving windows between desktops isn't supported on this Windows build.");
+        }
+
+        var target = FindDesktop(desktopId);
+        var hr = _views.GetViewForHwnd(window, out var view);
+        ThrowIfFailed(hr, "GetViewForHwnd");
+        if (view == 0)
+        {
+            throw new InvalidOperationException("This window can't be moved to another desktop.");
+        }
+
+        try
+        {
+            hr = _vdmi!.MoveViewToDesktop(view, target);
+            ThrowIfFailed(hr, "MoveViewToDesktop");
+        }
+        finally
+        {
+            Marshal.Release(view);
         }
     }
 
@@ -551,8 +595,10 @@ public sealed class VdComClient : IDisposable
     {
         ((object?)_vdmi as ComObject)?.FinalRelease();
         ((object?)_publicVdm as ComObject)?.FinalRelease();
+        ((object?)_views as ComObject)?.FinalRelease();
         _vdmi = null;
         _publicVdm = null;
+        _views = null;
     }
 
     // REGDB_E_CLASSNOTREG/CO_E_SERVER_EXEC_FAILURE are included alongside the RPC codes: a connect

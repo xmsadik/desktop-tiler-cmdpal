@@ -17,7 +17,7 @@ namespace DesktopTiler;
 /// while a restarted host takes seconds to come back and load extensions, so the old process is
 /// gone before the new host looks for it.
 /// </summary>
-internal static class HostProcessWatch
+internal static partial class HostProcessWatch
 {
     private const string HostProcessName = "Microsoft.CmdPal.UI";
 
@@ -67,7 +67,7 @@ internal static class HostProcessWatch
         }
     }
 
-    private sealed class HostExitedHandle : WaitHandle
+    private sealed partial class HostExitedHandle : WaitHandle
     {
         private readonly Process _host;
 

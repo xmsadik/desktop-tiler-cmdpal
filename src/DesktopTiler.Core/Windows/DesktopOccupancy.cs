@@ -22,23 +22,4 @@ public static class DesktopOccupancy
         && !w.HasOwner
         && w.HasTitle
         && !TargetWindowSelector.IsExcludedFromConsideration(w, ownProcessId, cmdPalImageName);
-
-    /// <summary>The set of desktop ids that at least one app window is on. <see cref="Guid.Empty"/>
-    /// (the id could not be read - a window that closed mid-query, or a suspended/background UWP
-    /// window) is ignored, as is any id that matches no desktop in the caller's list.</summary>
-    public static HashSet<Guid> OccupiedDesktops(IEnumerable<Guid> windowDesktopIds)
-    {
-        ArgumentNullException.ThrowIfNull(windowDesktopIds);
-
-        var occupied = new HashSet<Guid>();
-        foreach (var id in windowDesktopIds)
-        {
-            if (id != Guid.Empty)
-            {
-                occupied.Add(id);
-            }
-        }
-
-        return occupied;
-    }
 }

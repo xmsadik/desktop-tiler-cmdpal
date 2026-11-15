@@ -18,6 +18,14 @@ namespace DesktopTiler;
 /// </summary>
 internal sealed partial class AllWindowsPage : ListPage
 {
+    private static readonly IconInfo BringHereIcon = new("\uE8A7"); // OpenInNewWindow
+    private static readonly IconInfo MoveIcon = new("\uE8DE"); // MoveToFolder
+    private static readonly IconInfo CloseIcon = new("\uE8BB"); // ChromeClose
+
+    // After a move or close from the context menu the page stays open; give the window a moment
+    // to actually go before the list is rebuilt.
+    private static readonly TimeSpan RefreshDelay = TimeSpan.FromMilliseconds(300);
+
     private static readonly IconInfo WindowFallbackIcon = new(""); // OpenInNewWindow glyph, for windows whose exe path can't be read
 
     private readonly VdComClient _vdClient;
@@ -106,11 +114,76 @@ internal sealed partial class AllWindowsPage : ListPage
                 Title = entry.Title,
                 Subtitle = Describe(entry, currentId),
                 Icon = entry.ImagePath.Length > 0 ? new IconInfo(entry.ImagePath) : WindowFallbackIcon,
+                MoreCommands = ContextCommands(entry, desktops, currentId),
             });
         }
 
         return [.. items];
     }
+
+    /// <summary>The row's context menu: bring the window to this desktop, move it to each other
+    /// desktop, close it. A window on no particular desktop (pinned) only gets "Close window".</summary>
+    private IContextItem[] ContextCommands(WindowListEntry entry, IReadOnlyList<DesktopInfo> desktops, Guid currentId)
+    {
+        var window = entry.Handle;
+        var commands = new List<IContextItem>();
+        if (entry.Desktop is { } own)
+        {
+            if (own.Id != currentId && currentId != Guid.Empty)
+            {
+                commands.Add(new CommandContextItem(new WindowActionCommand("Bring to this desktop", BringHereIcon, () =>
+                {
+                    _vdClient.MoveWindowAsync(window, currentId).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+                    _vdClient.ActivateWindowAsync(currentId, window, animate: false).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+                    return CommandResult.Dismiss();
+                })));
+            }
+
+            foreach (var d in desktops)
+            {
+                if (d.Id == own.Id)
+                {
+                    continue;
+                }
+
+                var target = d.Id;
+                var number = (d.Index + 1).ToString(CultureInfo.InvariantCulture);
+                var label = string.IsNullOrEmpty(d.Name) ? $"Move to desktop {number}" : $"Move to desktop {number} · {d.Name}";
+                commands.Add(new CommandContextItem(new WindowActionCommand(label, MoveIcon, () =>
+                {
+                    _vdClient.MoveWindowAsync(window, target).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+                    RefreshSoon();
+                    return CommandResult.KeepOpen();
+                })));
+            }
+        }
+
+        commands.Add(new CommandContextItem(new WindowActionCommand("Close window", CloseIcon, () =>
+        {
+            WindowEnumerator.RequestClose(window);
+            RefreshSoon();
+            return CommandResult.KeepOpen();
+        }))
+        {
+            IsCritical = true,
+        });
+
+        return [.. commands];
+    }
+
+    private void RefreshSoon() => _ = System.Threading.Tasks.Task.Delay(RefreshDelay).ContinueWith(
+        _ =>
+        {
+            try
+            {
+                RaiseItemsChanged();
+            }
+            catch (Exception ex)
+            {
+                SpikeLog.WriteLine($"AllWindowsPage refresh failed: {ex.Message}");
+            }
+        },
+        System.Threading.Tasks.TaskScheduler.Default);
 
     private string Describe(WindowListEntry entry, Guid currentId)
     {

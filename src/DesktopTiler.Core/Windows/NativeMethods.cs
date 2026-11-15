@@ -40,6 +40,7 @@ internal static partial class NativeMethods
     internal const int ObjIdWindow = 0;
     internal const uint GaRoot = 2;
     internal const uint WmQuit = 0x0012;
+    internal const uint WmClose = 0x0010;
     internal const uint PmNoRemove = 0x0000;
 
     internal delegate bool EnumWindowsProc(nint hWnd, nint lParam);
@@ -61,6 +62,10 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial nint GetShellWindow();
+
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     internal static partial nint GetWindowLongPtr(nint hWnd, int nIndex);

@@ -115,7 +115,7 @@ internal partial interface IVirtualDesktopManagerInternal
     int GetCount(out int count); // unused (we use GetDesktops().GetCount() instead)
 
     [PreserveSig]
-    int MoveViewToDesktop(nint view, nint desktop); // unused placeholder
+    int MoveViewToDesktop(nint view, IVirtualDesktop desktop);
 
     [PreserveSig]
     int CanViewMoveDesktops(nint view, out int canMove); // unused placeholder
@@ -176,6 +176,38 @@ internal partial interface IVirtualDesktopManagerInternal
 
     [PreserveSig]
     int WaitForAnimationToComplete();
+}
+
+/// <summary>The same IServiceProvider as <see cref="IServiceProvider10"/> (same IID, so a cast
+/// QueryInterfaces to it), but returning the service as a raw pointer, for services other than
+/// the desktop manager (see <see cref="IApplicationViewCollection"/>).</summary>
+[GeneratedComInterface]
+[Guid("6D5140C1-7436-11CE-8034-00AA006009FA")]
+internal partial interface IServiceProviderRaw
+{
+    [PreserveSig]
+    int QueryService(in Guid guidService, in Guid riid, out nint ppvObject);
+}
+
+/// <summary>Undocumented collection of application views (one per top-level window). Only
+/// GetViewForHwnd is used, to get the view <see cref="IVirtualDesktopManagerInternal.MoveViewToDesktop"/>
+/// takes; the slots before it are placeholders that keep the vtable layout. Obtained through
+/// QueryService with its own IID as the service id. Layout per Windows 11 24H2.</summary>
+[GeneratedComInterface]
+[Guid("1841C6D7-4F9D-42C0-AF41-8747538F10E5")]
+internal partial interface IApplicationViewCollection
+{
+    [PreserveSig]
+    int GetViews(out nint array); // unused placeholder
+
+    [PreserveSig]
+    int GetViewsByZOrder(out nint array); // unused placeholder
+
+    [PreserveSig]
+    int GetViewsByAppUserModelId(nint id, out nint array); // unused placeholder
+
+    [PreserveSig]
+    int GetViewForHwnd(nint hwnd, out nint view);
 }
 
 /// <summary>Public, documented IVirtualDesktopManager (shobjidl_core.h). Stable across builds;

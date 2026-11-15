@@ -43,6 +43,42 @@ public static class TargetWindowSelector
         && w.HasTitle
         && w.IsOnCurrentVirtualDesktop;
 
+    /// <summary>Whether <paramref name="w"/> is an app window shown on the current desktop - what
+    /// the "move window to desktop" commands act on. Looser than <see cref="IsTileable"/>:
+    /// maximized and fixed-size windows can be moved too.</summary>
+    public static bool IsMovable(WindowDescriptor w, int ownProcessId, string cmdPalImageName) =>
+        DesktopOccupancy.IsAppWindow(w, ownProcessId, cmdPalImageName)
+        && !w.IsCloaked
+        && w.IsOnCurrentVirtualDesktop;
+
+    /// <summary>The window the "move window to desktop" commands act on: the foreground window if
+    /// it's a movable app window (a hotkey invocation), otherwise the top-most non-minimized
+    /// movable window in Z-order (invoked from the palette, which then holds the foreground).
+    /// Null if there's none.</summary>
+    public static WindowDescriptor? SelectActiveAppWindow(
+        WindowDescriptor? foreground,
+        IReadOnlyList<WindowDescriptor> windowsInZOrder,
+        int ownProcessId,
+        string cmdPalImageName)
+    {
+        ArgumentNullException.ThrowIfNull(windowsInZOrder);
+
+        if (foreground is { } fg && IsMovable(fg, ownProcessId, cmdPalImageName))
+        {
+            return fg;
+        }
+
+        foreach (var w in windowsInZOrder)
+        {
+            if (!w.IsMinimized && IsMovable(w, ownProcessId, cmdPalImageName))
+            {
+                return w;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// <paramref name="windowsInZOrder"/> must be every top-level window, front (foreground-most)
     /// to back - i.e. the order <c>EnumWindows</c> returns them in. Returns null if there is no

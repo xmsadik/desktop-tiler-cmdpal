@@ -15,7 +15,9 @@ namespace DesktopTiler;
 /// Clicking an item switches to that desktop. Each item's icon is a filled square if the desktop
 /// has at least one app window on it, an outlined square if it's empty, with a blue ring around
 /// it on the active desktop, whose title is also marked "●" with a bold number (no icon at all
-/// if occupancy couldn't be determined); <see cref="WindowEventWatcher"/> keeps it live as windows come and go.
+/// if occupancy couldn't be determined). With a Compact Dock, hovering a button also lists that
+/// desktop's windows (the subtitle's extra lines, see DesktopWindowGroups.TooltipSubtitle and
+/// DockLayoutProbe); <see cref="WindowEventWatcher"/> keeps it live as windows come and go.
 ///
 /// Also usable as an ordinary <see cref="ListPage"/> (so it can be opened as a page, not just as
 /// a Dock band), which is why it implements <see cref="ListPage.RaiseItemsChanged"/> semantics.
@@ -37,23 +39,25 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
     private readonly RegistryDesktopReader _registryReader;
     private readonly SettingsManager _settingsManager;
     private readonly WindowEventWatcher _windowWatcher;
+    private readonly DockLayoutProbe _dockLayout;
 
     // The occupancy set the Dock last rendered (written by GetItems). Window events recompute it
     // and only refresh the band when it actually differs, so the constant churn of unrelated
     // windows showing/hiding doesn't redraw the band. Replaced, never mutated.
-    private volatile HashSet<Guid>? _lastOccupied;
+    private volatile Dictionary<Guid, List<nint>>? _lastWindows;
 
     // The band's items, one per desktop id, reused across refreshes (see GetItems). GetItems runs
     // on host threads as well as the registry poll thread, hence the lock.
     private readonly Dictionary<Guid, ListItem> _items = [];
     private readonly object _itemsGate = new();
 
-    public DesktopsPage(VdComClient vdClient, RegistryDesktopReader registryReader, SettingsManager settingsManager, WindowEventWatcher windowWatcher)
+    public DesktopsPage(VdComClient vdClient, RegistryDesktopReader registryReader, SettingsManager settingsManager, WindowEventWatcher windowWatcher, DockLayoutProbe dockLayout)
     {
         _vdClient = vdClient;
         _registryReader = registryReader;
         _settingsManager = settingsManager;
         _windowWatcher = windowWatcher;
+        _dockLayout = dockLayout;
 
         Id = "DesktopTiler.page.desktops";
         Title = "Desktops";
@@ -64,6 +68,7 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
         _registryReader.Changed += OnRegistryChanged;
         _settingsManager.ShowDesktopNamesChanged += OnShowDesktopNamesChanged;
         _windowWatcher.Changed += OnWindowsChanged;
+        _dockLayout.Changed += OnDockLayoutChanged;
     }
 
     /// <summary>Raised whenever the item set has changed (registry poll saw a change, a switch we just
@@ -76,6 +81,7 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
         _registryReader.Changed -= OnRegistryChanged;
         _settingsManager.ShowDesktopNamesChanged -= OnShowDesktopNamesChanged;
         _windowWatcher.Changed -= OnWindowsChanged;
+        _dockLayout.Changed -= OnDockLayoutChanged;
     }
 
     /// <summary>Called by the switch command right after a successful switch, since the COM
@@ -125,8 +131,12 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
             currentId = Guid.Empty;
         }
 
-        var occupied = ComputeOccupied();
-        _lastOccupied = occupied;
+        var windows = ComputeDesktopWindows();
+        _lastWindows = windows;
+
+        // The window list rides on extra subtitle lines, which only stay out of sight (and so
+        // only reach the tooltip) while the Dock hides subtitles - see DockLayoutProbe.
+        var windowListInTooltip = _dockLayout.SubtitlesHidden;
 
         var items = new IListItem[desktops.Count];
         lock (_itemsGate)
@@ -155,8 +165,15 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
 
                 ((SwitchDesktopCommand)item.Command!).Name = $"Desktop {number}";
                 item.Title = title;
-                item.Icon = occupied is null ? null : IconFor(occupied.Contains(desktop.Id), isActive);
-                item.Subtitle = _settingsManager.ShowDesktopNames ? desktop.Name ?? string.Empty : string.Empty;
+                var onDesktop = windows is not null && windows.TryGetValue(desktop.Id, out var list) ? list : null;
+                item.Icon = windows is null ? null : IconFor(onDesktop is not null, isActive);
+
+                // The subtitle's first line is the label (the desktop name); the window titles on
+                // the lines after it only show up in the hover tooltip (see DesktopWindowGroups).
+                var name = _settingsManager.ShowDesktopNames ? desktop.Name : null;
+                item.Subtitle = windowListInTooltip
+                    ? DesktopWindowGroups.TooltipSubtitle(name, onDesktop?.Select(WindowEnumerator.GetTitle).ToArray() ?? [])
+                    : name ?? string.Empty;
                 items[i] = item;
             }
 
@@ -198,11 +215,13 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
 
     private void OnShowDesktopNamesChanged(object? sender, EventArgs e) => Refresh();
 
+    private void OnDockLayoutChanged(object? sender, EventArgs e) => Refresh();
+
     private void OnWindowsChanged(object? sender, EventArgs e)
     {
-        var occupied = ComputeOccupied();
-        var last = _lastOccupied;
-        if (occupied is not null && last is not null && occupied.SetEquals(last))
+        var windows = ComputeDesktopWindows();
+        var last = _lastWindows;
+        if (windows is not null && last is not null && DesktopWindowGroups.SameMembership(windows, last))
         {
             return;
         }
@@ -210,24 +229,25 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
         Refresh();
     }
 
-    /// <summary>The ids of the desktops that have at least one app window on them, or null if
-    /// that couldn't be determined (logged; the band then just shows no icons).</summary>
-    private HashSet<Guid>? ComputeOccupied()
+    /// <summary>The app windows on each desktop (front first), keyed by desktop id; a desktop with
+    /// none has no entry. Null if that couldn't be determined (logged; the band then shows no
+    /// occupancy icons and no window list in the tooltip).</summary>
+    private Dictionary<Guid, List<nint>>? ComputeDesktopWindows()
     {
         try
         {
-            using var timing = SpikeLog.Timed("DesktopsPage.ComputeOccupied");
+            using var timing = SpikeLog.Timed("DesktopsPage.ComputeDesktopWindows");
             var ownPid = Environment.ProcessId;
             var handles = WindowEnumerator.EnumerateZOrder(null)
                 .Where(w => DesktopOccupancy.IsAppWindow(w, ownPid, WindowEnumerator.CmdPalImageName))
                 .Select(w => w.Handle)
                 .ToArray();
             var ids = _vdClient.GetWindowDesktopIdsAsync(handles).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
-            return DesktopOccupancy.OccupiedDesktops(ids);
+            return DesktopWindowGroups.Group(handles, ids);
         }
         catch (Exception ex)
         {
-            SpikeLog.WriteLine($"DesktopsPage.ComputeOccupied failed: {ex.Message}");
+            SpikeLog.WriteLine($"DesktopsPage.ComputeDesktopWindows failed: {ex.Message}");
             return null;
         }
     }

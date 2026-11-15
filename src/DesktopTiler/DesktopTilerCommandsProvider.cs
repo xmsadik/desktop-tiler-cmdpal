@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DesktopTiler.Core.Layouts;
 using DesktopTiler.Core.VirtualDesktops;
 using DesktopTiler.Core.Windows;
@@ -13,6 +14,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly VdComClient _vdClient;
     private readonly RegistryDesktopReader _registryReader;
     private readonly WindowEventWatcher _windowWatcher;
+    private readonly DockLayoutProbe _dockLayout;
     private readonly LayoutOsd _osd;
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _tileMemory;
@@ -44,7 +46,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _osd = new LayoutOsd();
 
         _windowWatcher = new WindowEventWatcher();
-        _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher);
+        _dockLayout = new DockLayoutProbe();
+        _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher, _dockLayout);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
         _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager);
@@ -73,6 +76,9 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(new DesktopNumberCommand(_vdClient, _registryReader, 9)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, +1)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, -1)),
+            .. Enumerable.Range(1, 9).Select(n => new CommandItem(MoveWindowToDesktopCommand.ToNumber(_vdClient, _registryReader, n))),
+            new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, +1)),
+            new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, -1)),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
@@ -98,6 +104,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     {
         _desktopsPage.Dispose();
         _windowWatcher.Dispose();
+        _dockLayout.Dispose();
         _osd.Dispose();
         _registryReader.Dispose();
         _vdClient.Dispose();

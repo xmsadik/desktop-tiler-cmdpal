@@ -28,6 +28,18 @@ $dist    = Join-Path $root 'dist'
 [xml]$manifestXml = Get-Content (Join-Path $root 'src\DesktopTiler\Package.appxmanifest')
 $subject = $manifestXml.Package.Identity.Publisher
 
+# Start the Release publish from clean intermediates: the trimmed publish's DesktopTiler.deps.json
+# (under obj) isn't regenerated incrementally, so after code starts using a framework assembly the
+# previous build trimmed away (e.g. System.IO.FileSystem.Watcher), the package would ship that DLL
+# but a stale deps.json without it, and the extension would crash at startup with
+# FileNotFoundException. project.assets.json sits directly under obj, so restore is unaffected.
+$rid = "win-$($Platform.ToLower())"
+foreach ($stale in @(
+    (Join-Path $root "src\DesktopTiler\obj\$Platform\Release"),
+    (Join-Path $root "src\DesktopTiler\bin\Release\net10.0-windows10.0.26100.0\$rid\publish"))) {
+  if (Test-Path $stale) { Remove-Item $stale -Recurse -Force }
+}
+
 # A trailing backslash immediately before the closing quote (-p:AppxPackageDir="$dist\") breaks
 # once $dist contains a space: Windows argv parsing treats \" as an escaped literal quote, not
 # "backslash then end-of-string", so the argument merges with the next one instead of terminating.
