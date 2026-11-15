@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using DesktopTiler.Core.Layouts;
+using DesktopTiler.Core.Rules;
 using DesktopTiler.Core.VirtualDesktops;
 using DesktopTiler.Core.Windows;
 using Microsoft.CommandPalette.Extensions;
@@ -21,6 +22,9 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly TileMemoryStore _tileMemory;
     private readonly DesktopsPage _desktopsPage;
     private readonly ManageDesktopsPage _manageDesktopsPage;
+    private readonly WindowRuleStore _ruleStore;
+    private readonly WindowRuleEnforcer _ruleEnforcer;
+    private readonly WindowRulesPage _windowRulesPage;
     private readonly AllWindowsPage _allWindowsPage;
     private readonly ListItem _allWindowsBandItem;
     private readonly WrappedDockItem _dockBand;
@@ -59,15 +63,21 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher, _dockLayout);
         _manageDesktopsPage = new ManageDesktopsPage(desktopManager, _vdClient, _registryReader, _desktopsPage);
 
+        // Window rules: kept in rules.json next to settings.json; the enforcer moves new windows.
+        WindowRuleStore.Log = SpikeLog.WriteLine;
+        _ruleStore = new WindowRuleStore(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsManager.SettingsJsonPath())!, "rules.json"));
+        _ruleEnforcer = new WindowRuleEnforcer(_vdClient, _windowWatcher, _ruleStore);
+        _windowRulesPage = new WindowRulesPage(_ruleStore, desktopManager);
+
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
-        _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager);
+        _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore);
 
         // The last button of the band opens the "All windows" list: icon plus an "All windows" subtitle,
         // which the Dock shows in default size and hides in compact size, like the desktop names. The
         // title is a zero-width space: with an empty title the Dock centres the subtitle on one line, while a
         // (blank) title keeps the two-line layout of the desktop buttons, subtitle at the bottom. Its own page
         // instance has an empty command name (see AllWindowsPage's name parameter).
-        var bandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
+        var bandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
         _allWindowsBandItem = new ListItem(bandPage) { Title = "\u200B", Subtitle = "All windows", Icon = bandPage.Icon };
 
         _dockBand = new WrappedDockItem(BandItems(), "DesktopTiler.dock.desktops", "Desktops");
@@ -100,6 +110,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(desktopManager.MoveCommand(null, +1, keepOpen: false, "DesktopTiler.desktop.moveright", "Move current desktop right")),
             new CommandItem(desktopManager.DeleteCommand(null, keepOpen: false, "DesktopTiler.desktop.delete", "Delete current desktop")),
             new CommandItem(_manageDesktopsPage) { Subtitle = "Create, rename, reorder and delete desktops" },
+            new CommandItem(_windowRulesPage) { Subtitle = "Apps whose new windows open on a chosen desktop" },
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
@@ -136,6 +147,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
 
     public override void Dispose()
     {
+        _ruleEnforcer.Dispose();
+        _windowRulesPage.Dispose();
         _manageDesktopsPage.Dispose();
         _desktopsPage.Dispose();
         _windowWatcher.Dispose();

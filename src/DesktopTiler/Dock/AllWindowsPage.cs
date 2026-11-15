@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using DesktopTiler.Core.Rules;
 using DesktopTiler.Core.VirtualDesktops;
 using DesktopTiler.Core.Windows;
 using Microsoft.CommandPalette.Extensions;
@@ -34,15 +35,17 @@ internal sealed partial class AllWindowsPage : ListPage
     private readonly RegistryDesktopReader _registryReader;
     private readonly DesktopsPage _desktopsPage;
     private readonly SettingsManager _settingsManager;
+    private readonly WindowRuleStore _rules;
 
     /// <param name="name">The command name. The Dock button passes an empty one: with no title the
     /// Dock falls back to showing the name, and that button should be icon-only.</param>
-    public AllWindowsPage(VdComClient vdClient, RegistryDesktopReader registryReader, DesktopsPage desktopsPage, SettingsManager settingsManager, string name = "All windows")
+    public AllWindowsPage(VdComClient vdClient, RegistryDesktopReader registryReader, DesktopsPage desktopsPage, SettingsManager settingsManager, WindowRuleStore rules, string name = "All windows")
     {
         _vdClient = vdClient;
         _registryReader = registryReader;
         _desktopsPage = desktopsPage;
         _settingsManager = settingsManager;
+        _rules = rules;
 
         Id = "DesktopTiler.windows";
         Name = name;
@@ -181,6 +184,11 @@ internal sealed partial class AllWindowsPage : ListPage
                 RefreshSoon();
                 return CommandResult.KeepOpen();
             })));
+
+            if (RuleCommand(entry.ImagePath, own) is { } rule)
+            {
+                commands.Add(new CommandContextItem(rule));
+            }
         }
 
         commands.Add(new CommandContextItem(new WindowActionCommand("Close window", CloseIcon, () =>
@@ -194,6 +202,38 @@ internal sealed partial class AllWindowsPage : ListPage
         });
 
         return [.. commands];
+    }
+
+    /// <summary>"Always open on desktop N" (makes or retargets the window's app's rule), or
+    /// "Remove window rule" when that rule already exists. The app's name is on the
+    /// row already and the menu is narrow, so it's left out here; the toast names both. Null for
+    /// windows no rule can be made for (see <see cref="WindowRules.CanHaveRule"/>).</summary>
+    private WindowActionCommand? RuleCommand(string imagePath, DesktopInfo own)
+    {
+        if (!WindowRules.CanHaveRule(imagePath))
+        {
+            return null;
+        }
+
+        var app = WindowRules.AppName(imagePath);
+        var shortName = System.IO.Path.GetFileNameWithoutExtension(app);
+        var where = DesktopManager.Label(own);
+        var number = (own.Index + 1).ToString(CultureInfo.InvariantCulture);
+        if (WindowRules.Find(_rules.Rules, imagePath) is { } existing && existing.DesktopId == own.Id)
+        {
+            return new WindowActionCommand("Remove window rule", WindowRulesPage.RuleIcon, () =>
+            {
+                _rules.Remove(app);
+                return CommandResult.ShowToast(new ToastArgs { Message = $"{shortName} no longer has a window rule", Result = CommandResult.KeepOpen() });
+            });
+        }
+
+        var target = own.Id;
+        return new WindowActionCommand($"Always open on desktop {number}", WindowRulesPage.RuleIcon, () =>
+        {
+            _rules.Set(new WindowRule(app, target, imagePath));
+            return CommandResult.ShowToast(new ToastArgs { Message = $"New {shortName} windows will open on {where}", Result = CommandResult.KeepOpen() });
+        });
     }
 
     private void RefreshSoon() => _ = System.Threading.Tasks.Task.Delay(RefreshDelay).ContinueWith(
