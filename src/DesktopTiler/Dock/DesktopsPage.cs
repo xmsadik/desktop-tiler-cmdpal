@@ -137,11 +137,13 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
                 var number = i + 1;
                 var isActive = desktop.Id == currentId;
 
-                // The ring on the icon marks the active desktop; only when occupancy (and so the
-                // icon) is unavailable does the title fall back to a "●" marker.
-                var title = isActive && occupied is null
-                    ? "●" + number.ToString(CultureInfo.InvariantCulture)
-                    : number.ToString(CultureInfo.InvariantCulture);
+                // The active desktop: blue ring on the icon plus a bold number (the Dock can't
+                // style its labels, so bold Unicode digits stand in for a bold font). Only when
+                // occupancy (and so the icon) is unavailable does a "●" marker replace the ring.
+                var digits = number.ToString(CultureInfo.InvariantCulture);
+                var title = !isActive ? digits
+                    : occupied is null ? "●" + digits
+                    : BoldDigits(digits);
 
                 // One long-lived item per desktop, updated in place: the Dock keeps the item it
                 // already shows when the band is refreshed and only picks up property changes,
@@ -168,6 +170,19 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
         }
 
         return items;
+    }
+
+    /// <summary>"12" -> "𝟭𝟮": ASCII digits mapped to MATHEMATICAL SANS-SERIF BOLD DIGIT ZERO
+    /// (U+1D7EC) onwards, which read as bold digits in the Dock's sans-serif font.</summary>
+    internal static string BoldDigits(string digits)
+    {
+        var sb = new System.Text.StringBuilder(digits.Length * 2);
+        foreach (var c in digits)
+        {
+            sb.Append(c is >= '0' and <= '9' ? char.ConvertFromUtf32(0x1D7EC + (c - '0')) : c.ToString());
+        }
+
+        return sb.ToString();
     }
 
     private static IconInfo IconFor(bool occupied, bool active) => (occupied, active) switch

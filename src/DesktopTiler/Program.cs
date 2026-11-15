@@ -29,9 +29,17 @@ public class Program
             server.RegisterClass<DesktopTilerExtension, IExtension>(() => extensionInstance);
             server.Start();
 
-            // This will make the main thread wait until the event is signalled by the extension class.
-            // Since we have single instance of the extension object, we exit as soon as it is disposed.
-            extensionDisposedEvent.WaitOne();
+            // Wait until the host disposes the extension - or until the host process exits
+            // without doing so (restarted, updated, crashed): see HostProcessWatch for why this
+            // process must not outlive it.
+            using var hostExited = HostProcessWatch.TryGetHostExitedHandle();
+            WaitHandle[] waits = hostExited is null ? [extensionDisposedEvent] : [extensionDisposedEvent, hostExited];
+            if (WaitHandle.WaitAny(waits) == 1)
+            {
+                SpikeLog.WriteLine("Command Palette host exited; shutting down");
+                extensionInstance.Dispose();
+            }
+
             server.Stop();
             server.UnsafeDispose();
         }
