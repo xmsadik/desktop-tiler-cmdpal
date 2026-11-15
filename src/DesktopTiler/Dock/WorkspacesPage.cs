@@ -11,7 +11,7 @@ using Microsoft.CommandPalette.Extensions.Toolkit;
 namespace DesktopTiler;
 
 /// <summary>
-/// "Workspaces": a "Save current layout as workspace" row, then one row per workspace. Choosing a
+/// "Desktop workspaces": a "Save layout as desktop workspace" row, then one row per workspace. Choosing a
 /// workspace opens it; its context menu edits its apps, renames it, or deletes it.
 /// </summary>
 internal sealed partial class WorkspacesPage : ListPage, IDisposable
@@ -36,10 +36,10 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
         _desktops = desktops;
 
         Id = "DesktopTiler.workspaces";
-        Name = "Workspaces";
-        Title = "Workspaces";
+        Name = "Desktop workspaces";
+        Title = "Desktop workspaces";
         Icon = WorkspaceIcon;
-        PlaceholderText = "Search workspaces; choose one to open it";
+        PlaceholderText = "Search desktop workspaces; choose one to open it";
 
         _store.Changed += OnStoreChanged;
     }
@@ -65,7 +65,7 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
         var id = workspace.Id;
         return new DesktopActionCommand(
             topLevel ? $"DesktopTiler.workspace.open.{id:N}" : null,
-            topLevel ? $"Open workspace: {workspace.Name}" : "Open workspace",
+            topLevel ? $"Open desktop workspace: {workspace.Name}" : "Open desktop workspace",
             WorkspaceIcon,
             () => launcher.Open(id, keepOpen));
     }
@@ -98,7 +98,7 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
             var desktops = _desktops.ReadDesktops();
             var items = new List<IListItem>
             {
-                new ListItem(new DesktopActionCommand(null, "Save current layout as workspace", SaveIcon, () => _launcher.SaveCurrentLayout(keepOpen: true)))
+                new ListItem(new DesktopActionCommand(null, "Save layout as desktop workspace", SaveIcon, () => _launcher.SaveCurrentLayout(keepOpen: true)))
                 {
                     Subtitle = "Every open app with the desktop it's on",
                 },
@@ -116,7 +116,7 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
                     [
                         new CommandContextItem(EditPage(id)),
                         new CommandContextItem(new RenameWorkspacePage(_store, id)),
-                        new CommandContextItem(new DesktopActionCommand(null, "Delete workspace", DeleteIcon, () => ConfirmDelete(id))) { IsCritical = true },
+                        new CommandContextItem(new DesktopActionCommand(null, "Delete desktop workspace", DeleteIcon, () => ConfirmDelete(id))) { IsCritical = true },
                     ],
                 });
             }
@@ -167,7 +167,7 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
 
         return CommandResult.Confirm(new ConfirmationArgs
         {
-            Title = $"Delete workspace \"{ws.Name}\"?",
+            Title = $"Delete desktop workspace \"{ws.Name}\"?",
             Description = "Only the workspace is deleted; no app is closed.",
             PrimaryCommand = new DesktopActionCommand(null, "Delete", DeleteIcon, () =>
             {
@@ -337,8 +337,8 @@ internal sealed partial class RenameWorkspacePage : ContentPage
     {
         _store = store;
         _workspaceId = workspaceId;
-        Name = "Rename workspace";
-        Title = "Rename workspace";
+        Name = "Rename desktop workspace";
+        Title = "Rename desktop workspace";
         Icon = new IconInfo(""); // Rename
     }
 

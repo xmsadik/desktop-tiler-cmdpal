@@ -33,7 +33,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly WrappedDockItem _dockBand;
     private readonly ICommandItem[] _commands;
 
-    // _commands plus one "Open workspace: …" per workspace; rebuilt when the workspaces change.
+    // _commands plus one "Open desktop workspace: …" per workspace; rebuilt when the workspaces change.
     private volatile ICommandItem[] _topLevel;
 
     public DesktopTilerCommandsProvider()
@@ -124,7 +124,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(desktopManager.DeleteCommand(null, keepOpen: false, "DesktopTiler.desktop.delete", "Delete current desktop")),
             new CommandItem(_manageDesktopsPage) { Subtitle = "Create, rename, reorder and delete desktops" },
             new CommandItem(_windowRulesPage) { Subtitle = "Apps whose new windows open on a chosen desktop" },
-            new CommandItem(new DesktopActionCommand("DesktopTiler.workspace.save", "Save current layout as workspace", WorkspacesPage.SaveIcon, () => _workspaceLauncher.SaveCurrentLayout(keepOpen: false))),
+            new CommandItem(new DesktopActionCommand("DesktopTiler.workspace.save", "Save layout as desktop workspace", WorkspacesPage.SaveIcon, () => _workspaceLauncher.SaveCurrentLayout(keepOpen: false))),
             new CommandItem(_workspacesPage) { Subtitle = "Open a saved set of apps, each on its own desktop" },
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
@@ -162,7 +162,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         .. _commands,
         .. _workspaceStore.Workspaces.Select(w => new CommandItem(WorkspacesPage.OpenCommand(_workspaceLauncher, w, keepOpen: false, topLevel: true))
         {
-            Subtitle = "Workspace",
+            Subtitle = "Desktop workspace",
         }),
     ];
 
