@@ -62,7 +62,7 @@ internal sealed partial class SettingsManager : JsonSettingsManager
         Namespaced(nameof(UseAnimation)),
         "Switch animation",
         "Animate when switching desktops",
-        true);
+        false);
 
     private readonly ToggleSetting _showDesktopNames = new(
         Namespaced(nameof(ShowDesktopNames)),

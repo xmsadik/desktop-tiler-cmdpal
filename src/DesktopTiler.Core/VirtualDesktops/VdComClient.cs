@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading;
 using System.Threading.Tasks;
+using DesktopTiler.Core.Windows;
 
 namespace DesktopTiler.Core.VirtualDesktops;
 
@@ -61,7 +62,7 @@ public sealed class VdComClient : IDisposable
     private ExceptionDispatchInfo? _initError;
     private IVirtualDesktopManagerInternal? _vdmi;
     private IVirtualDesktopManager? _publicVdm;
-    private volatile bool _useAnimation = true;
+    private volatile bool _useAnimation;
     private int _disposed;
 
     // 0 = idle; otherwise Environment.TickCount64 when the action currently executing on the STA
@@ -88,9 +89,9 @@ public sealed class VdComClient : IDisposable
         _initError?.Throw();
     }
 
-    /// <summary>Whether the switch path animates: <see langword="true"/> (the default) uses
+    /// <summary>Whether the switch path animates: <see langword="true"/> uses
     /// <c>SwitchDesktopWithAnimation</c>, falling back to the plain <c>SwitchDesktop</c> if that
-    /// fails or is unavailable (see <see cref="SwitchCore"/>); <see langword="false"/> calls
+    /// fails or is unavailable (see <see cref="SwitchTo"/>); <see langword="false"/> (the default) calls
     /// <c>SwitchDesktop</c> directly. Backs the "Switch animation" setting - the provider sets it
     /// at startup and again whenever that setting changes. Written from whatever thread raises the
     /// settings-changed event and read on this client's dedicated STA thread, hence
@@ -298,6 +299,22 @@ public sealed class VdComClient : IDisposable
 
         var target = FindDesktop(id);
 
+        // Park the foreground on the shell window for the duration of the switch so windows on
+        // the desktop being left don't flash in the taskbar (see ForegroundParking). Released in
+        // finally so a failed switch never leaves the focus on the bare desktop.
+        var parked = ForegroundParking.Park();
+        try
+        {
+            SwitchTo(target, animate);
+        }
+        finally
+        {
+            ForegroundParking.Release(parked);
+        }
+    }
+
+    private void SwitchTo(IVirtualDesktop target, bool animate)
+    {
         // Both gates must allow it: the caller's own animate argument (every current call site
         // passes true, i.e. "animate if the user wants animation") AND the user's "Switch
         // animation" setting. Either one being false means a plain, non-animated switch.

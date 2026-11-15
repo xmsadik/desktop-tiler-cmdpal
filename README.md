@@ -113,7 +113,7 @@ Command Palette → *Desktop Tiler* → *Settings*:
 - **Default layout**: the layout `Tile: Retile` and `Tile: Next layout` start from before anything has been tiled this session (default Master-stack).
 - **Master ratio**: how much of the work area the master pane takes up, for Master-stack and Center-master, 40-70% (default 55%).
 - **Gap**: space left between tiled windows and the work area's edge: 0, 4, 8, 12, or 16 px (default 8 px).
-- **Switch animation**: animate when switching desktops (default on).
+- **Switch animation**: animate when switching desktops (default off: switches are instant).
 - **Show desktop names**: show desktop names as the Dock band's subtitles (default on).
 
 ## Limitations

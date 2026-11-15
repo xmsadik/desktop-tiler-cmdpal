@@ -22,6 +22,7 @@ internal static partial class NativeMethods
     internal const int DwmwaExtendedFrameBounds = 9;
     internal const int SwMaximize = 3;
     internal const int SwShowNoActivate = 4;
+    internal const int SwMinimize = 6;
     internal const uint SwpNoSize = 0x0001;
     internal const uint SwpNoMove = 0x0002;
     internal const uint SwpNoZOrder = 0x0004;
@@ -52,6 +53,13 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial nint GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetForegroundWindow(nint hWnd);
+
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetShellWindow();
 
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     internal static partial nint GetWindowLongPtr(nint hWnd, int nIndex);
