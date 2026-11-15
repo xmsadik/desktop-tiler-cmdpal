@@ -20,6 +20,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _tileMemory;
     private readonly DesktopsPage _desktopsPage;
+    private readonly ManageDesktopsPage _manageDesktopsPage;
     private readonly AllWindowsPage _allWindowsPage;
     private readonly ListItem _allWindowsBandItem;
     private readonly WrappedDockItem _dockBand;
@@ -54,7 +55,9 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
 
         _windowWatcher = new WindowEventWatcher();
         _dockLayout = new DockLayoutProbe();
+        var desktopManager = new DesktopManager(_vdClient, _registryReader);
         _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher, _dockLayout);
+        _manageDesktopsPage = new ManageDesktopsPage(desktopManager, _vdClient, _registryReader, _desktopsPage);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
         _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager);
@@ -90,6 +93,13 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             .. Enumerable.Range(1, 9).Select(n => new CommandItem(MoveWindowToDesktopCommand.ToNumber(_vdClient, _registryReader, n, follow: true))),
             new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, +1, follow: true)),
             new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, -1, follow: true)),
+            new CommandItem(desktopManager.NewCommand(follow: false, keepOpen: false, "DesktopTiler.desktop.new")),
+            new CommandItem(desktopManager.NewCommand(follow: true, keepOpen: false, "DesktopTiler.desktop.new.go")),
+            new CommandItem(new RenameDesktopPage(desktopManager, null, keepOpen: false) { Id = "DesktopTiler.desktop.rename", Name = "Rename current desktop" }),
+            new CommandItem(desktopManager.MoveCommand(null, -1, keepOpen: false, "DesktopTiler.desktop.moveleft", "Move current desktop left")),
+            new CommandItem(desktopManager.MoveCommand(null, +1, keepOpen: false, "DesktopTiler.desktop.moveright", "Move current desktop right")),
+            new CommandItem(desktopManager.DeleteCommand(null, keepOpen: false, "DesktopTiler.desktop.delete", "Delete current desktop")),
+            new CommandItem(_manageDesktopsPage) { Subtitle = "Create, rename, reorder and delete desktops" },
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
@@ -126,6 +136,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
 
     public override void Dispose()
     {
+        _manageDesktopsPage.Dispose();
         _desktopsPage.Dispose();
         _windowWatcher.Dispose();
         _dockLayout.Dispose();

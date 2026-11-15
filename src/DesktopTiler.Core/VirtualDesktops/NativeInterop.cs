@@ -44,6 +44,20 @@ internal static partial class Ole32
     internal static partial int CoCreateInstance(in Guid rclsid, nint pUnkOuter, uint dwClsContext, in Guid riid, out nint ppv);
 }
 
+/// <summary>
+/// combase.dll HSTRING functions, for the one call that takes a WinRT string
+/// (<see cref="IVirtualDesktopManagerInternal.SetDesktopName"/>). The HSTRING is passed as a raw
+/// pointer rather than marshaled, so the caller creates it here and deletes it after the call.
+/// </summary>
+internal static partial class Combase
+{
+    [LibraryImport("combase.dll", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial int WindowsCreateString(string sourceString, uint length, out nint hstring);
+
+    [LibraryImport("combase.dll")]
+    internal static partial int WindowsDeleteString(nint hstring);
+}
+
 // --- Undocumented Virtual Desktop COM interfaces --------------------------------------------
 //
 // Declared with [GeneratedComInterface] (source-generated COM, trim/AOT-safe) instead of the
@@ -107,7 +121,8 @@ internal partial interface IVirtualDesktop
 
 /// <summary>Undocumented desktop manager. Declared in full vtable order through
 /// SwitchDesktopWithAnimation/WaitForAnimationToComplete per the Phase 1 spec; only the members
-/// actually needed by <see cref="VdComClient"/> are typed richly, the rest are nint placeholders.</summary>
+/// actually needed by <see cref="VdComClient"/> are typed richly (switching, moving windows, and
+/// creating/removing/renaming/reordering desktops), the rest are nint placeholders.</summary>
 [GeneratedComInterface]
 [Guid("53F5CA0B-158F-4124-900C-057158060B27")]
 internal partial interface IVirtualDesktopManagerInternal
@@ -137,13 +152,13 @@ internal partial interface IVirtualDesktopManagerInternal
     int SwitchDesktopAndMoveForegroundView(nint desktop); // unused placeholder
 
     [PreserveSig]
-    int CreateDesktop(out nint desktop); // unused placeholder
+    int CreateDesktop(out IVirtualDesktop? desktop);
 
     [PreserveSig]
-    int MoveDesktop(nint desktop, int index); // unused placeholder
+    int MoveDesktop(IVirtualDesktop desktop, int index);
 
     [PreserveSig]
-    int RemoveDesktop(nint desktop, nint fallback); // unused placeholder
+    int RemoveDesktop(IVirtualDesktop desktop, IVirtualDesktop fallback);
 
     [PreserveSig]
     int FindDesktop(in Guid desktopId, out nint desktop); // unused placeholder
@@ -152,7 +167,7 @@ internal partial interface IVirtualDesktopManagerInternal
     int GetDesktopSwitchIncludeExcludeViews(nint desktop, out nint unknown1, out nint unknown2); // unused placeholder
 
     [PreserveSig]
-    int SetDesktopName(nint desktop, nint name); // unused placeholder
+    int SetDesktopName(IVirtualDesktop desktop, nint hstringName); // raw HSTRING, see Combase
 
     [PreserveSig]
     int SetDesktopWallpaper(nint desktop, nint path); // unused placeholder

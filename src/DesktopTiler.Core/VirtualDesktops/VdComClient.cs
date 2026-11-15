@@ -155,6 +155,44 @@ public sealed class VdComClient : IDisposable
         return true;
     });
 
+    /// <summary>Adds a desktop at the end and returns its id; the current desktop doesn't
+    /// change.</summary>
+    public Task<Guid> CreateDesktopAsync() => RunAsync(CreateDesktopCore);
+
+    /// <summary>Removes desktop <paramref name="desktopId"/>. Its windows move to the desktop on
+    /// its left (the second one if it's the first, see
+    /// <see cref="DesktopManagementRules.FallbackIndex"/>), which also becomes current if the
+    /// removed one was. Throws <see cref="InvalidOperationException"/> for the last remaining
+    /// desktop.</summary>
+    public Task RemoveDesktopAsync(Guid desktopId) => RunAsync(() =>
+    {
+        RemoveDesktopCore(desktopId);
+        return true;
+    });
+
+    /// <summary>Moves desktop <paramref name="desktopId"/> to 0-based position
+    /// <paramref name="index"/> in display order.</summary>
+    public Task MoveDesktopAsync(Guid desktopId, int index) => RunAsync(() =>
+    {
+        EnsureInternalConnected();
+        var hr = _vdmi!.MoveDesktop(FindDesktop(desktopId), index);
+        ThrowIfFailed(hr, "MoveDesktop");
+        return true;
+    });
+
+    /// <summary>Names desktop <paramref name="desktopId"/>; an empty name removes the name, so
+    /// the desktop shows its default label again. The name is passed through as given (see
+    /// <see cref="DesktopManagementRules.NormalizeName"/> for cleaning user input).</summary>
+    public Task RenameDesktopAsync(Guid desktopId, string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return RunAsync(() =>
+        {
+            RenameDesktopCore(desktopId, name);
+            return true;
+        });
+    }
+
     public Task<bool> IsWindowOnCurrentVirtualDesktopAsync(nint hwnd) => RunAsync(() => IsOnCurrentCore(hwnd));
 
     /// <summary>The desktop id of each of <paramref name="hwnds"/> (same order), all in a single
@@ -361,6 +399,55 @@ public sealed class VdComClient : IDisposable
         finally
         {
             ForegroundParking.Release(parked);
+        }
+    }
+
+    private Guid CreateDesktopCore()
+    {
+        EnsureInternalConnected();
+
+        var hr = _vdmi!.CreateDesktop(out var desktop);
+        ThrowIfFailed(hr, "CreateDesktop");
+        hr = desktop!.GetId(out var id);
+        ThrowIfFailed(hr, "IVirtualDesktop.GetId");
+        return id;
+    }
+
+    private void RemoveDesktopCore(Guid desktopId)
+    {
+        EnsureInternalConnected();
+
+        var desktops = new List<(IVirtualDesktop Desktop, Guid Id)>(EnumerateDesktops());
+        var index = desktops.FindIndex(d => d.Id == desktopId);
+        if (index < 0)
+        {
+            throw new InvalidOperationException($"Virtual desktop {desktopId} was not found.");
+        }
+
+        var fallback = DesktopManagementRules.FallbackIndex(desktops.Count, index)
+            ?? throw new InvalidOperationException("The last desktop can't be removed.");
+
+        var hr = _vdmi!.RemoveDesktop(desktops[index].Desktop, desktops[fallback].Desktop);
+        ThrowIfFailed(hr, "RemoveDesktop");
+    }
+
+    private void RenameDesktopCore(Guid desktopId, string name)
+    {
+        EnsureInternalConnected();
+
+        var target = FindDesktop(desktopId);
+        var hr = Combase.WindowsCreateString(name, (uint)name.Length, out var hstring);
+        ThrowIfFailed(hr, "WindowsCreateString");
+        try
+        {
+            hr = _vdmi!.SetDesktopName(target, hstring);
+            ThrowIfFailed(hr, "SetDesktopName");
+        }
+        finally
+        {
+            // An empty string is the null HSTRING, which needs (and allows) no delete; deleting
+            // it is a harmless no-op either way.
+            _ = Combase.WindowsDeleteString(hstring);
         }
     }
 
