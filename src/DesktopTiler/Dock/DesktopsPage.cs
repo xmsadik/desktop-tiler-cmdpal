@@ -14,8 +14,8 @@ namespace DesktopTiler;
 /// "1"/"2"/..., subtitle = the desktop's name if it has one.
 /// Clicking an item switches to that desktop. Each item's icon is a filled square if the desktop
 /// has at least one app window on it, an outlined square if it's empty, with a blue ring around
-/// it on the active desktop (no icon at all if that couldn't be determined - the active desktop's
-/// title is then marked "●N" instead); <see cref="WindowEventWatcher"/> keeps it live as windows come and go.
+/// it on the active desktop, whose title is also marked "●" with a bold number (no icon at all
+/// if occupancy couldn't be determined); <see cref="WindowEventWatcher"/> keeps it live as windows come and go.
 ///
 /// Also usable as an ordinary <see cref="ListPage"/> (so it can be opened as a page, not just as
 /// a Dock band), which is why it implements <see cref="ListPage.RaiseItemsChanged"/> semantics.
@@ -137,13 +137,11 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
                 var number = i + 1;
                 var isActive = desktop.Id == currentId;
 
-                // The active desktop: blue ring on the icon plus a bold number (the Dock can't
-                // style its labels, so bold Unicode digits stand in for a bold font). Only when
-                // occupancy (and so the icon) is unavailable does a "●" marker replace the ring.
+                // The active desktop: blue ring on the icon, plus "●" and a bold number in the
+                // title (the Dock can't style its labels, so bold Unicode digits stand in for a
+                // bold font).
                 var digits = number.ToString(CultureInfo.InvariantCulture);
-                var title = !isActive ? digits
-                    : occupied is null ? "●" + digits
-                    : BoldDigits(digits);
+                var title = isActive ? "●" + BoldDigits(digits) : digits;
 
                 // One long-lived item per desktop, updated in place: the Dock keeps the item it
                 // already shows when the band is refreshed and only picks up property changes,
