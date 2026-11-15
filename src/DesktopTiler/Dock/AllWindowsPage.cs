@@ -14,10 +14,16 @@ namespace DesktopTiler;
 /// "All windows": every app window on every virtual desktop, grouped by desktop in display order
 /// (see <see cref="WindowListBuilder"/>). Choosing one switches to its desktop and brings it to
 /// the front. Opened from the button at the end of the Dock band, or as a top-level command
-/// (so it can have a hotkey). The list is rebuilt each time the host asks for it, so it's
-/// current whenever the page is opened; the host filters it by the search text itself.
+/// (so it can have a hotkey). The list is rebuilt each time the host asks for it; the host filters
+/// it by the search text itself.
+///
+/// The host keeps an open page when the palette is hidden and shows it again as it was, without
+/// asking for the items again. So the page also raises ItemsChanged whenever the Dock band's
+/// desktop page refreshes (<see cref="DesktopsPage.Refreshed"/>): that happens when windows open,
+/// close or change desktop, and when the current desktop or a desktop name changes - exactly what
+/// this list shows - and the band has already compared the window sets, so no extra scan is needed.
 /// </summary>
-internal sealed partial class AllWindowsPage : ListPage
+internal sealed partial class AllWindowsPage : ListPage, IDisposable
 {
     private static readonly IconInfo BringHereIcon = new("\uE8A7"); // OpenInNewWindow
     private static readonly IconInfo MoveIcon = new("\uE8DE"); // MoveToFolder
@@ -52,7 +58,11 @@ internal sealed partial class AllWindowsPage : ListPage
         Title = "All windows";
         Icon = new IconInfo(""); // TaskView glyph: stacked windows
         PlaceholderText = "Search windows on all desktops";
+
+        _desktopsPage.Refreshed += OnDesktopsRefreshed;
     }
+
+    public void Dispose() => _desktopsPage.Refreshed -= OnDesktopsRefreshed;
 
     public override IListItem[] GetItems()
     {
@@ -234,6 +244,19 @@ internal sealed partial class AllWindowsPage : ListPage
             _rules.Set(new WindowRule(app, target, imagePath));
             return CommandResult.ShowToast(new ToastArgs { Message = $"New {shortName} windows will open on {where}", Result = CommandResult.KeepOpen() });
         });
+    }
+
+    private void OnDesktopsRefreshed(object? sender, EventArgs e)
+    {
+        try
+        {
+            RaiseItemsChanged();
+        }
+        catch (Exception ex)
+        {
+            // Raised on a watcher/poll thread: an escaping exception would end the process.
+            SpikeLog.WriteLine($"AllWindowsPage refresh failed: {ex.Message}");
+        }
     }
 
     private void RefreshSoon() => _ = System.Threading.Tasks.Task.Delay(RefreshDelay).ContinueWith(

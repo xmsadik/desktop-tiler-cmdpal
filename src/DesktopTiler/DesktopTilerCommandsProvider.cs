@@ -29,6 +29,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly WorkspaceLauncher _workspaceLauncher;
     private readonly WorkspacesPage _workspacesPage;
     private readonly AllWindowsPage _allWindowsPage;
+    private readonly AllWindowsPage _allWindowsBandPage;
     private readonly ListItem _allWindowsBandItem;
     private readonly WrappedDockItem _dockBand;
     private readonly ICommandItem[] _commands;
@@ -90,8 +91,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         // title is a zero-width space: with an empty title the Dock centres the subtitle on one line, while a
         // (blank) title keeps the two-line layout of the desktop buttons, subtitle at the bottom. Its own page
         // instance has an empty command name (see AllWindowsPage's name parameter).
-        var bandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
-        _allWindowsBandItem = new ListItem(bandPage) { Title = "\u200B", Subtitle = "All windows", Icon = bandPage.Icon };
+        _allWindowsBandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
+        _allWindowsBandItem = new ListItem(_allWindowsBandPage) { Title = "\u200B", Subtitle = "All windows", Icon = _allWindowsBandPage.Icon };
 
         _dockBand = new WrappedDockItem(BandItems(), "DesktopTiler.dock.desktops", "Desktops");
         _desktopsPage.Refreshed += (_, _) => _dockBand.Items = BandItems();
@@ -190,6 +191,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _ruleEnforcer.Dispose();
         _windowRulesPage.Dispose();
         _manageDesktopsPage.Dispose();
+        _allWindowsPage.Dispose();
+        _allWindowsBandPage.Dispose();
         _desktopsPage.Dispose();
         _windowWatcher.Dispose();
         _dockLayout.Dispose();
