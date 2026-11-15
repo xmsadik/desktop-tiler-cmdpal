@@ -7,6 +7,7 @@ A PowerToys Command Palette extension for switching virtual desktops and tiling 
 - **In the Dock:** a *Desktops* band with one button per Windows virtual desktop (`1`, `2`, `3`...), the active one ringed in blue and marked `●` with a bold number, optionally subtitled with the desktop's name. Each button's icon shows whether that desktop has any app windows on it: a filled square if it does, an outlined one if it's empty (minimized windows count). Click a button to switch. Updates live as you switch, add, remove, or rename desktops, and as windows open, close, or move between desktops. The last button (stacked windows icon) opens **All windows**. With a Compact Dock, hovering a desktop button lists the windows on it.
 - **All windows:** every app window on every desktop, grouped by desktop in order, with the desktop number/name and app in the subtitle. Type to filter; pick one to switch to its desktop and bring it to the front. Each row's context menu (right-click or <kbd>Ctrl</kbd>+<kbd>K</kbd>) can bring the window to the current desktop, move it to another desktop, show it on all desktops (or only on one again), or close it. Open it from the Dock button or bind a hotkey to it.
 - **Move windows:** `Move window to desktop 1`...`9`, `Move window to next desktop`, `Move window to previous desktop` send the active window to that desktop and keep you where you are; the `... and go` variants take you along and bring the window to the front - bind hotkeys to them (e.g. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>...<kbd>9</kbd>).
+- **Manage desktops:** `New desktop` (and `New desktop and go`), `Rename current desktop`, `Move current desktop left` / `right`, and `Delete current desktop`. The `Manage desktops` page lists every desktop; each row's context menu (<kbd>Ctrl</kbd>+<kbd>K</kbd>) renames, moves or deletes that desktop. Deleting asks first and moves the desktop's windows to its left neighbour (the second desktop if it was the first); the last desktop can't be deleted.
 - **Switch desktops:** `Desktop 1`...`Desktop 9`, `Next desktop`, `Previous desktop`, and `Last used desktop`, which flips between the two most recent desktops (like Alt+Tab) - bind hotkeys to them in Command Palette settings.
 - **Tile windows, once:** `Tile: Master-stack`, `Tile: Columns`, `Tile: Grid`, `Tile: Monocle`, `Tile: Center-master` arrange the tileable windows on the focused monitor into that layout. `Tile: Next layout` cycles through them in that order. `Tile: Retile` re-applies whatever you last tiled with, keeping window order - if you clicked a different window first, that window becomes master. `Tile: Rotate` shifts the remembered window order by one step, so the next window in line becomes master; press it repeatedly until the one you want is in the master (or center) slot. After each pass, the layout's name and the result (e.g. **Grid** · *Tiled 4 windows*) flash briefly in the middle of that monitor, on top of the windows just moved; it doesn't take focus and clicks pass through it.
 
@@ -99,6 +100,13 @@ Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=48
 | Tile: Retile | `DesktopTiler.tile.retile` |
 | Tile: Rotate | `DesktopTiler.tile.rotate` |
 | All windows | `DesktopTiler.windows` (page) |
+| New desktop | `DesktopTiler.desktop.new` |
+| New desktop and go | `DesktopTiler.desktop.new.go` |
+| Rename current desktop | `DesktopTiler.desktop.rename` (page) |
+| Move current desktop left | `DesktopTiler.desktop.moveleft` |
+| Move current desktop right | `DesktopTiler.desktop.moveright` |
+| Delete current desktop | `DesktopTiler.desktop.delete` |
+| Manage desktops | `DesktopTiler.desktops.manage` (page) |
 | Desktop Tiler settings | (settings page) |
 
 Ids are stable across releases, so a hotkey bound to one keeps working; `Desktop 3`, for example, always means "the 3rd desktop in display order right now", not a specific desktop that might later be removed.
