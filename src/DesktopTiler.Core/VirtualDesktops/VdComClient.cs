@@ -63,6 +63,7 @@ public sealed class VdComClient : IDisposable
     private IVirtualDesktopManagerInternal? _vdmi;
     private IVirtualDesktopManager? _publicVdm;
     private IApplicationViewCollection? _views;
+    private IVirtualDesktopPinnedApps? _pinnedApps;
     private volatile bool _useAnimation;
     private int _disposed;
 
@@ -133,6 +134,24 @@ public sealed class VdComClient : IDisposable
     public Task MoveWindowAsync(nint window, Guid desktopId) => RunAsync(() =>
     {
         MoveWindowCore(window, desktopId);
+        return true;
+    });
+
+    /// <summary>Whether each of <paramref name="windows"/> is shown on all desktops (same
+    /// order), in one STA hop. A window whose state can't be read counts as not pinned. All false
+    /// if this build doesn't expose the pinned-apps service.</summary>
+    public Task<IReadOnlyList<bool>> GetWindowsPinnedAsync(IReadOnlyList<nint> windows)
+    {
+        ArgumentNullException.ThrowIfNull(windows);
+        return RunAsync<IReadOnlyList<bool>>(() => GetWindowsPinnedCore(windows));
+    }
+
+    /// <summary>Shows <paramref name="window"/> on all desktops (<paramref name="pinned"/> true)
+    /// or only on its current one. Throws <see cref="NotSupportedException"/> if this build
+    /// doesn't expose the services needed.</summary>
+    public Task SetWindowPinnedAsync(nint window, bool pinned) => RunAsync(() =>
+    {
+        SetWindowPinnedCore(window, pinned);
         return true;
     });
 
@@ -274,6 +293,10 @@ public sealed class VdComClient : IDisposable
         // makes just that feature unavailable (MoveWindowAsync throws NotSupportedException).
         hr = ((IServiceProviderRaw)(object)shell).QueryService(typeof(IApplicationViewCollection).GUID, typeof(IApplicationViewCollection).GUID, out var viewsPtr);
         _views = hr >= 0 && viewsPtr != 0 ? WrapAndRelease<IApplicationViewCollection>(viewsPtr) : null;
+
+        // Likewise only for "show on all desktops"; a failure just disables that.
+        hr = ((IServiceProviderRaw)(object)shell).QueryService(VdGuids.ClsidVirtualDesktopPinnedApps, typeof(IVirtualDesktopPinnedApps).GUID, out var pinnedPtr);
+        _pinnedApps = hr >= 0 && pinnedPtr != 0 ? WrapAndRelease<IVirtualDesktopPinnedApps>(pinnedPtr) : null;
     }
 
     /// <summary>Connects the public, documented IVirtualDesktopManager if it isn't already, on this
@@ -338,6 +361,68 @@ public sealed class VdComClient : IDisposable
         finally
         {
             ForegroundParking.Release(parked);
+        }
+    }
+
+    private bool[] GetWindowsPinnedCore(IReadOnlyList<nint> windows)
+    {
+        EnsureInternalConnected();
+        var result = new bool[windows.Count];
+        if (_views is null || _pinnedApps is null)
+        {
+            return result;
+        }
+
+        for (var i = 0; i < windows.Count; i++)
+        {
+            if (_views.GetViewForHwnd(windows[i], out var view) < 0 || view == 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                result[i] = _pinnedApps.IsViewPinned(view, out var pinned) >= 0 && pinned != 0;
+            }
+            finally
+            {
+                Marshal.Release(view);
+            }
+        }
+
+        return result;
+    }
+
+    private void SetWindowPinnedCore(nint window, bool pinned)
+    {
+        EnsureInternalConnected();
+        if (_views is null || _pinnedApps is null)
+        {
+            throw new NotSupportedException("Showing windows on all desktops isn't supported on this Windows build.");
+        }
+
+        var hr = _views.GetViewForHwnd(window, out var view);
+        ThrowIfFailed(hr, "GetViewForHwnd");
+        if (view == 0)
+        {
+            throw new InvalidOperationException("This window can't be shown on all desktops.");
+        }
+
+        try
+        {
+            hr = _pinnedApps.IsViewPinned(view, out var current);
+            ThrowIfFailed(hr, "IsViewPinned");
+            if ((current != 0) == pinned)
+            {
+                return; // already in the requested state
+            }
+
+            hr = pinned ? _pinnedApps.PinView(view) : _pinnedApps.UnpinView(view);
+            ThrowIfFailed(hr, pinned ? "PinView" : "UnpinView");
+        }
+        finally
+        {
+            Marshal.Release(view);
         }
     }
 
@@ -596,9 +681,11 @@ public sealed class VdComClient : IDisposable
         ((object?)_vdmi as ComObject)?.FinalRelease();
         ((object?)_publicVdm as ComObject)?.FinalRelease();
         ((object?)_views as ComObject)?.FinalRelease();
+        ((object?)_pinnedApps as ComObject)?.FinalRelease();
         _vdmi = null;
         _publicVdm = null;
         _views = null;
+        _pinnedApps = null;
     }
 
     // REGDB_E_CLASSNOTREG/CO_E_SERVER_EXEC_FAILURE are included alongside the RPC codes: a connect

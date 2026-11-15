@@ -21,6 +21,8 @@ internal sealed partial class AllWindowsPage : ListPage
     private static readonly IconInfo BringHereIcon = new("\uE8A7"); // OpenInNewWindow
     private static readonly IconInfo MoveIcon = new("\uE8DE"); // MoveToFolder
     private static readonly IconInfo CloseIcon = new("\uE8BB"); // ChromeClose
+    private static readonly IconInfo PinIcon = new("\uE718"); // Pin
+    private static readonly IconInfo UnpinIcon = new("\uE77A"); // Unpin
 
     // After a move or close from the context menu the page stays open; give the window a moment
     // to actually go before the list is rebuilt.
@@ -106,15 +108,21 @@ internal sealed partial class AllWindowsPage : ListPage
             currentId = Guid.Empty; // only the "current" marker is lost
         }
 
+        // Which windows are shown on all desktops, in one STA hop; a pinned window reports a
+        // desktop id that matches no desktop, so it is already in the "All desktops" group.
+        var pinned = _vdClient.GetWindowsPinnedAsync(entries.Select(e => e.Handle).ToArray())
+            .WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+
         var items = new List<IListItem>(entries.Count);
-        foreach (var entry in entries)
+        for (var i = 0; i < entries.Count; i++)
         {
+            var entry = entries[i];
             items.Add(new ListItem(new ActivateWindowCommand(_vdClient, entry.Desktop?.Id, entry.Handle, _desktopsPage))
             {
                 Title = entry.Title,
                 Subtitle = Describe(entry, currentId),
                 Icon = entry.ImagePath.Length > 0 ? new IconInfo(entry.ImagePath) : WindowFallbackIcon,
-                MoreCommands = ContextCommands(entry, desktops, currentId),
+                MoreCommands = ContextCommands(entry, desktops, currentId, pinned[i]),
             });
         }
 
@@ -122,12 +130,22 @@ internal sealed partial class AllWindowsPage : ListPage
     }
 
     /// <summary>The row's context menu: bring the window to this desktop, move it to each other
-    /// desktop, close it. A window on no particular desktop (pinned) only gets "Close window".</summary>
-    private IContextItem[] ContextCommands(WindowListEntry entry, IReadOnlyList<DesktopInfo> desktops, Guid currentId)
+    /// desktop, show it on all desktops, close it. A pinned window gets "Show only on this
+    /// desktop" and "Close window"; a window on no known desktop otherwise only "Close window".</summary>
+    private IContextItem[] ContextCommands(WindowListEntry entry, IReadOnlyList<DesktopInfo> desktops, Guid currentId, bool isPinned)
     {
         var window = entry.Handle;
         var commands = new List<IContextItem>();
-        if (entry.Desktop is { } own)
+        if (isPinned)
+        {
+            commands.Add(new CommandContextItem(new WindowActionCommand("Show only on this desktop", UnpinIcon, () =>
+            {
+                _vdClient.SetWindowPinnedAsync(window, false).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+                RefreshSoon();
+                return CommandResult.KeepOpen();
+            })));
+        }
+        else if (entry.Desktop is { } own)
         {
             if (own.Id != currentId && currentId != Guid.Empty)
             {
@@ -156,6 +174,13 @@ internal sealed partial class AllWindowsPage : ListPage
                     return CommandResult.KeepOpen();
                 })));
             }
+
+            commands.Add(new CommandContextItem(new WindowActionCommand("Show on all desktops", PinIcon, () =>
+            {
+                _vdClient.SetWindowPinnedAsync(window, true).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+                RefreshSoon();
+                return CommandResult.KeepOpen();
+            })));
         }
 
         commands.Add(new CommandContextItem(new WindowActionCommand("Close window", CloseIcon, () =>

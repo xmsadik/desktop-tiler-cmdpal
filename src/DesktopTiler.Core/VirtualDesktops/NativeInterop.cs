@@ -16,6 +16,7 @@ internal static class VdGuids
     public static readonly Guid ClsidImmersiveShell = new("C2F03A33-21F5-47FA-B4BB-156362A2F239");
     public static readonly Guid ClsidVirtualDesktopManagerInternal = new("C5E0CDCA-7B6E-41B2-9FC4-D93975CC467B");
     public static readonly Guid ClsidVirtualDesktopManager = new("AA509086-5CA9-4C25-8F95-589D3C07B48A");
+    public static readonly Guid ClsidVirtualDesktopPinnedApps = new("B5A399E7-1C87-46B8-88E9-FC5747B171BD");
 }
 
 /// <summary>
@@ -208,6 +209,34 @@ internal partial interface IApplicationViewCollection
 
     [PreserveSig]
     int GetViewForHwnd(nint hwnd, out nint view);
+}
+
+/// <summary>Undocumented "show this window / app on all desktops". Only the per-view members are
+/// used (with views from <see cref="IApplicationViewCollection.GetViewForHwnd"/>); the app-id
+/// ones are placeholders that keep the vtable layout. Obtained through QueryService with
+/// <see cref="VdGuids.ClsidVirtualDesktopPinnedApps"/>. Layout per Windows 11 24H2 (MScholtes
+/// VirtualDesktop11-24H2).</summary>
+[GeneratedComInterface]
+[Guid("4CE81583-1E4C-4632-A621-07A53543148F")]
+internal partial interface IVirtualDesktopPinnedApps
+{
+    [PreserveSig]
+    int IsAppIdPinned(nint appId, out int pinned); // unused placeholder
+
+    [PreserveSig]
+    int PinAppID(nint appId); // unused placeholder
+
+    [PreserveSig]
+    int UnpinAppID(nint appId); // unused placeholder
+
+    [PreserveSig]
+    int IsViewPinned(nint view, out int pinned);
+
+    [PreserveSig]
+    int PinView(nint view);
+
+    [PreserveSig]
+    int UnpinView(nint view);
 }
 
 /// <summary>Public, documented IVirtualDesktopManager (shobjidl_core.h). Stable across builds;
