@@ -6,8 +6,8 @@ A PowerToys Command Palette extension for switching virtual desktops and tiling 
 
 - **In the Dock:** a *Desktops* band with one button per Windows virtual desktop (`1`, `2`, `3`...), the active one ringed in blue and marked `●` with a bold number, optionally subtitled with the desktop's name. Each button's icon shows whether that desktop has any app windows on it: a filled square if it does, an outlined one if it's empty (minimized windows count). Click a button to switch. Updates live as you switch, add, remove, or rename desktops, and as windows open, close, or move between desktops. The last button (stacked windows icon) opens **All windows**. With a Compact Dock, hovering a desktop button lists the windows on it.
 - **All windows:** every app window on every desktop, grouped by desktop in order, with the desktop number/name and app in the subtitle. Type to filter; pick one to switch to its desktop and bring it to the front. Each row's context menu (right-click or <kbd>Ctrl</kbd>+<kbd>K</kbd>) can bring the window to the current desktop, move it to another desktop, or close it. Open it from the Dock button or bind a hotkey to it.
-- **Move windows:** `Move window to desktop 1`...`9`, `Move window to next desktop`, `Move window to previous desktop` send the active window to that desktop and keep you where you are - bind hotkeys to them (e.g. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>...<kbd>9</kbd>).
-- **Switch desktops:** `Desktop 1`...`Desktop 9`, `Next desktop`, `Previous desktop` - bind hotkeys to them in Command Palette settings.
+- **Move windows:** `Move window to desktop 1`...`9`, `Move window to next desktop`, `Move window to previous desktop` send the active window to that desktop and keep you where you are; the `... and go` variants take you along and bring the window to the front - bind hotkeys to them (e.g. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>...<kbd>9</kbd>).
+- **Switch desktops:** `Desktop 1`...`Desktop 9`, `Next desktop`, `Previous desktop`, and `Last used desktop`, which flips between the two most recent desktops (like Alt+Tab) - bind hotkeys to them in Command Palette settings.
 - **Tile windows, once:** `Tile: Master-stack`, `Tile: Columns`, `Tile: Grid`, `Tile: Monocle`, `Tile: Center-master` arrange the tileable windows on the focused monitor into that layout. `Tile: Next layout` cycles through them in that order. `Tile: Retile` re-applies whatever you last tiled with, keeping window order - if you clicked a different window first, that window becomes master. `Tile: Rotate` shifts the remembered window order by one step, so the next window in line becomes master; press it repeatedly until the one you want is in the master (or center) slot. After each pass, the layout's name and the result (e.g. **Grid** · *Tiled 4 windows*) flash briefly in the middle of that monitor, on top of the windows just moved; it doesn't take focus and clicks pass through it.
 
 Tiling is **one-shot, not continuous**: nothing is watched or re-tiled automatically. Open or close a window, then press the tile command again. Each pass only touches the monitor of the currently focused window, and only the current virtual desktop; window order is remembered per desktop+monitor for as long as the extension keeps running.
@@ -84,9 +84,12 @@ Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=48
 | Desktop 1 ... Desktop 9 | `DesktopTiler.desktop.1` ... `DesktopTiler.desktop.9` |
 | Next desktop | `DesktopTiler.desktop.next` |
 | Previous desktop | `DesktopTiler.desktop.prev` |
+| Last used desktop | `DesktopTiler.desktop.last` |
 | Move window to desktop 1 ... 9 | `DesktopTiler.move.1` ... `DesktopTiler.move.9` |
 | Move window to next desktop | `DesktopTiler.move.next` |
 | Move window to previous desktop | `DesktopTiler.move.prev` |
+| Move window to desktop 1 ... 9 and go | `DesktopTiler.moveandgo.1` ... `DesktopTiler.moveandgo.9` |
+| Move window to next / previous desktop and go | `DesktopTiler.moveandgo.next` / `DesktopTiler.moveandgo.prev` |
 | Tile: Master-stack | `DesktopTiler.tile.masterstack` |
 | Tile: Columns | `DesktopTiler.tile.columns` |
 | Tile: Grid | `DesktopTiler.tile.grid` |

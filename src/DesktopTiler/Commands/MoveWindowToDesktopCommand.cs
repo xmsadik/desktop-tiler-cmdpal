@@ -11,7 +11,8 @@ namespace DesktopTiler;
 /// <summary>
 /// "Move window to desktop 1".."9" (stable ids "DesktopTiler.move.1".."9") and "Move window to
 /// next/previous desktop" ("DesktopTiler.move.next"/"prev"): sends the active app window to that
-/// desktop and stays on the current one. The window is the foreground one when invoked by hotkey,
+/// desktop and stays on the current one. The "... and go" variants ("DesktopTiler.moveandgo.*")
+/// also switch to that desktop and bring the window to the front. The window is the foreground one when invoked by hotkey,
 /// otherwise the top-most app window on this desktop (see
 /// <see cref="TargetWindowSelector.SelectActiveAppWindow"/>). Next/previous follow registry display
 /// order and stop at the ends, like <see cref="StepDesktopCommand"/>.
@@ -24,32 +25,38 @@ internal sealed partial class MoveWindowToDesktopCommand : InvokableCommand
     private readonly RegistryDesktopReader _registryReader;
     private readonly int _number; // 1-based desktop number, or 0 for a step command
     private readonly int _step;
+    private readonly bool _follow;
 
-    private MoveWindowToDesktopCommand(VdComClient vdClient, RegistryDesktopReader registryReader, int number, int step)
+    private MoveWindowToDesktopCommand(VdComClient vdClient, RegistryDesktopReader registryReader, int number, int step, bool follow)
     {
         _vdClient = vdClient;
         _registryReader = registryReader;
         _number = number;
         _step = step;
+        _follow = follow;
         Icon = new IconInfo(""); // MoveToFolder
     }
 
-    public static MoveWindowToDesktopCommand ToNumber(VdComClient vdClient, RegistryDesktopReader registryReader, int number)
+    public static MoveWindowToDesktopCommand ToNumber(VdComClient vdClient, RegistryDesktopReader registryReader, int number, bool follow = false)
     {
         var n = number.ToString(CultureInfo.InvariantCulture);
-        return new(vdClient, registryReader, number, 0)
+        return new(vdClient, registryReader, number, 0, follow)
         {
-            Id = $"DesktopTiler.move.{n}",
-            Name = $"Move window to desktop {n}",
+            Id = $"DesktopTiler.{IdVerb(follow)}.{n}",
+            Name = $"Move window to desktop {n}{NameSuffix(follow)}",
         };
     }
 
-    public static MoveWindowToDesktopCommand ByStep(VdComClient vdClient, RegistryDesktopReader registryReader, int step) =>
-        new(vdClient, registryReader, 0, step)
+    public static MoveWindowToDesktopCommand ByStep(VdComClient vdClient, RegistryDesktopReader registryReader, int step, bool follow = false) =>
+        new(vdClient, registryReader, 0, step, follow)
         {
-            Id = step > 0 ? "DesktopTiler.move.next" : "DesktopTiler.move.prev",
-            Name = step > 0 ? "Move window to next desktop" : "Move window to previous desktop",
+            Id = $"DesktopTiler.{IdVerb(follow)}.{(step > 0 ? "next" : "prev")}",
+            Name = $"Move window to {(step > 0 ? "next" : "previous")} desktop{NameSuffix(follow)}",
         };
+
+    private static string IdVerb(bool follow) => follow ? "moveandgo" : "move";
+
+    private static string NameSuffix(bool follow) => follow ? " and go" : string.Empty;
 
     public override CommandResult Invoke()
     {
@@ -95,6 +102,11 @@ internal sealed partial class MoveWindowToDesktopCommand : InvokableCommand
             }
 
             _vdClient.MoveWindowAsync(window.Value, target.Id).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+            if (_follow)
+            {
+                _vdClient.ActivateWindowAsync(target.Id, window.Value, animate: true).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+            }
+
             return CommandResult.Dismiss();
         }
         catch (UnsupportedBuildException)

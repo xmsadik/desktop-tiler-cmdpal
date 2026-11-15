@@ -13,6 +13,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly SettingsManager _settingsManager;
     private readonly VdComClient _vdClient;
     private readonly RegistryDesktopReader _registryReader;
+    private readonly DesktopHistory _desktopHistory = new();
     private readonly WindowEventWatcher _windowWatcher;
     private readonly DockLayoutProbe _dockLayout;
     private readonly LayoutOsd _osd;
@@ -37,6 +38,12 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _settingsManager.UseAnimationChanged += (_, _) => _vdClient.UseAnimation = _settingsManager.UseAnimation;
 
         _registryReader = new RegistryDesktopReader();
+
+        // Feed "Last used desktop": every registry change (switches made any way) records the
+        // now-current desktop; the first reading runs off-thread so a slow Explorer at login
+        // can't hold up construction.
+        _registryReader.Changed += (_, _) => ObserveCurrentDesktop();
+        _ = System.Threading.Tasks.Task.Run(ObserveCurrentDesktop);
 
         // The default layout is read live from settings (see LayoutCycle's Func<LayoutKind>
         // constructor) rather than snapshotted here, so changing the "Default layout" setting
@@ -76,9 +83,13 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(new DesktopNumberCommand(_vdClient, _registryReader, 9)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, +1)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, -1)),
+            new CommandItem(new LastDesktopCommand(_vdClient, _registryReader, _desktopHistory)),
             .. Enumerable.Range(1, 9).Select(n => new CommandItem(MoveWindowToDesktopCommand.ToNumber(_vdClient, _registryReader, n))),
             new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, +1)),
             new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, -1)),
+            .. Enumerable.Range(1, 9).Select(n => new CommandItem(MoveWindowToDesktopCommand.ToNumber(_vdClient, _registryReader, n, follow: true))),
+            new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, +1, follow: true)),
+            new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, -1, follow: true)),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
@@ -95,6 +106,19 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     }
 
     public override ICommandItem[] TopLevelCommands() => _commands;
+
+    private void ObserveCurrentDesktop()
+    {
+        try
+        {
+            _desktopHistory.Observe(_vdClient.GetCurrentIdAsync().WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout));
+        }
+        catch (Exception ex)
+        {
+            // Unsupported build / Explorer restarting: the next change tries again.
+            SpikeLog.WriteLine($"ObserveCurrentDesktop failed: {ex.Message}");
+        }
+    }
 
     private IListItem[] BandItems() => [.. _desktopsPage.GetItems(), _allWindowsBandItem];
 
