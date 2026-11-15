@@ -23,6 +23,7 @@ internal static partial class NativeMethods
     internal const int SwMaximize = 3;
     internal const int SwShowNoActivate = 4;
     internal const int SwMinimize = 6;
+    internal const int SwRestore = 9;
     internal const uint SwpNoSize = 0x0001;
     internal const uint SwpNoMove = 0x0002;
     internal const uint SwpNoZOrder = 0x0004;
@@ -69,6 +70,9 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial int GetWindowTextLengthW(nint hWnd);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowTextW")]
+    internal static partial int GetWindowTextRaw(nint hWnd, nint lpString, int nMaxCount);
 
     [LibraryImport("user32.dll", EntryPoint = "GetClassNameW")]
     internal static partial int GetClassNameRaw(nint hWnd, nint lpClassName, int nMaxCount);

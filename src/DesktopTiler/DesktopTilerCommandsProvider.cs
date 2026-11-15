@@ -17,6 +17,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly LayoutCycle _cycle;
     private readonly TileMemoryStore _tileMemory;
     private readonly DesktopsPage _desktopsPage;
+    private readonly AllWindowsPage _allWindowsPage;
+    private readonly ListItem _allWindowsBandItem;
     private readonly WrappedDockItem _dockBand;
     private readonly ICommandItem[] _commands;
 
@@ -45,8 +47,18 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
-        _dockBand = new WrappedDockItem(_desktopsPage.GetItems(), "DesktopTiler.dock.desktops", "Desktops");
-        _desktopsPage.Refreshed += (_, _) => _dockBand.Items = _desktopsPage.GetItems();
+        _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager);
+
+        // The last button of the band opens the "All windows" list: icon plus an "All windows" subtitle,
+        // which the Dock shows in default size and hides in compact size, like the desktop names. The
+        // title is a zero-width space: with an empty title the Dock centres the subtitle on one line, while a
+        // (blank) title keeps the two-line layout of the desktop buttons, subtitle at the bottom. Its own page
+        // instance has an empty command name (see AllWindowsPage's name parameter).
+        var bandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
+        _allWindowsBandItem = new ListItem(bandPage) { Title = "\u200B", Subtitle = "All windows", Icon = bandPage.Icon };
+
+        _dockBand = new WrappedDockItem(BandItems(), "DesktopTiler.dock.desktops", "Desktops");
+        _desktopsPage.Refreshed += (_, _) => _dockBand.Items = BandItems();
 
         _commands =
         [
@@ -69,6 +81,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(new NextLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd)),
             new CommandItem(new RetileCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd)),
             new CommandItem(new RotateCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd)),
+            new CommandItem(_allWindowsPage) { Title = "All windows", Subtitle = "Windows on every desktop; pick one to switch to it" },
             new CommandItem(_settingsManager.Settings.SettingsPage) { Title = "Desktop Tiler settings" },
         ];
 
@@ -76,6 +89,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     }
 
     public override ICommandItem[] TopLevelCommands() => _commands;
+
+    private IListItem[] BandItems() => [.. _desktopsPage.GetItems(), _allWindowsBandItem];
 
     public override ICommandItem[]? GetDockBands() => [_dockBand];
 

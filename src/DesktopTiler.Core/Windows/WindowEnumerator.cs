@@ -102,6 +102,32 @@ public static class WindowEnumerator
         }
     }
 
+    /// <summary>The window's title bar text, or empty if it has none or it closed meanwhile.</summary>
+    public static string GetTitle(nint h)
+    {
+        var length = NativeMethods.GetWindowTextLengthW(h);
+        if (length <= 0)
+        {
+            return string.Empty;
+        }
+
+        var bufferChars = length + 1;
+        var buffer = Marshal.AllocHGlobal(bufferChars * 2);
+        try
+        {
+            var copied = NativeMethods.GetWindowTextRaw(h, buffer, bufferChars);
+            return copied > 0 ? Marshal.PtrToStringUni(buffer, copied) : string.Empty;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    /// <summary>Full path of the executable that owns process <paramref name="pid"/>, or empty if
+    /// it can't be read (elevated/protected process, or it exited).</summary>
+    public static string GetImagePath(int pid) => TryGetImagePath(pid);
+
     private static bool IsCloaked(nint h)
     {
         var hr = NativeMethods.DwmGetWindowAttribute(h, NativeMethods.DwmwaCloaked, out int cloaked, sizeof(int));
@@ -124,6 +150,12 @@ public static class WindowEnumerator
     }
 
     private static string TryGetImageName(int pid)
+    {
+        var path = TryGetImagePath(pid);
+        return path.Length == 0 ? string.Empty : Path.GetFileName(path);
+    }
+
+    private static string TryGetImagePath(int pid)
     {
         if (pid == 0)
         {
@@ -150,8 +182,7 @@ public static class WindowEnumerator
                     return string.Empty;
                 }
 
-                var fullPath = Marshal.PtrToStringUni(buffer, size);
-                return Path.GetFileName(fullPath);
+                return Marshal.PtrToStringUni(buffer, size);
             }
             finally
             {

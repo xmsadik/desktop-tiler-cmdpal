@@ -113,6 +113,17 @@ public sealed class VdComClient : IDisposable
         return true;
     });
 
+    /// <summary>Brings <paramref name="window"/> to the front, first switching to
+    /// <paramref name="desktopId"/> if that isn't the current desktop (null: the window is on no
+    /// particular desktop, e.g. pinned to all of them - no switch). Same foreground handling as
+    /// <see cref="SwitchAsync"/>, except the focus ends on that window instead of whichever is
+    /// topmost on the new desktop.</summary>
+    public Task ActivateWindowAsync(Guid? desktopId, nint window, bool animate) => RunAsync(() =>
+    {
+        ActivateWindowCore(desktopId, window, animate);
+        return true;
+    });
+
     public Task<bool> IsWindowOnCurrentVirtualDesktopAsync(nint hwnd) => RunAsync(() => IsOnCurrentCore(hwnd));
 
     /// <summary>The desktop id of each of <paramref name="hwnds"/> (same order), all in a single
@@ -310,6 +321,32 @@ public sealed class VdComClient : IDisposable
         finally
         {
             ForegroundParking.Release(parked);
+        }
+    }
+
+    private void ActivateWindowCore(Guid? desktopId, nint window, bool animate)
+    {
+        IVirtualDesktop? target = null;
+        if (desktopId is { } id)
+        {
+            EnsureInternalConnected();
+            if (GetCurrentIdCore() != id)
+            {
+                target = FindDesktop(id);
+            }
+        }
+
+        var parked = ForegroundParking.Park();
+        try
+        {
+            if (target is not null)
+            {
+                SwitchTo(target, animate);
+            }
+        }
+        finally
+        {
+            ForegroundParking.ReleaseTo(parked, window);
         }
     }
 
