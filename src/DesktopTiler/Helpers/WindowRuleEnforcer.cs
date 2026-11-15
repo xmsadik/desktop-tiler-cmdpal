@@ -14,15 +14,20 @@ namespace DesktopTiler;
 /// already open when the extension started, or when the first rule was made, are left alone, and
 /// so is a window the user later moves elsewhere by hand (it isn't new any more).
 ///
-/// With no rules nothing is scanned at all; the tracker is reset instead, so adding the first
-/// rule starts from the windows open at that moment.
+/// Workspaces add one-off placements (<see cref="PendingPlacements"/>) through
+/// <see cref="PlaceNextWindows"/> just before starting an app; a placement wins over the app's
+/// rule while it lasts.
+///
+/// With no rules and no placements nothing is scanned at all; the tracker is reset instead, so
+/// adding the first rule (or placement) starts from the windows open at that moment.
 /// </summary>
-internal sealed class WindowRuleEnforcer : IDisposable
+internal sealed partial class WindowRuleEnforcer : IDisposable
 {
     private readonly VdComClient _vdClient;
     private readonly WindowEventWatcher _watcher;
     private readonly WindowRuleStore _store;
     private readonly NewWindowTracker _tracker = new();
+    private readonly PendingPlacements _placements = new();
 
     // Changed handlers run on the thread pool and can overlap; one pass at a time.
     private readonly object _gate = new();
@@ -38,6 +43,16 @@ internal sealed class WindowRuleEnforcer : IDisposable
 
         // Record the windows already open, off-thread so a slow Explorer can't hold up startup.
         _ = System.Threading.Tasks.Task.Run(() => Enforce("startup"));
+    }
+
+    /// <summary>Makes new windows of <paramref name="app"/> (an executable file name) that open
+    /// within <see cref="PendingPlacements.Lifetime"/> go to <paramref name="desktopId"/>. Call it
+    /// before starting the app: it records the windows open now first (synchronously), so the
+    /// app's window can't be mistaken for one that was already there.</summary>
+    public void PlaceNextWindows(string app, Guid desktopId)
+    {
+        _placements.Add(app, desktopId, Environment.TickCount64);
+        Enforce("placement added");
     }
 
     public void Dispose()
@@ -63,7 +78,8 @@ internal sealed class WindowRuleEnforcer : IDisposable
         try
         {
             var rules = _store.Rules;
-            if (rules.Count == 0)
+            var now = Environment.TickCount64;
+            if (rules.Count == 0 && !_placements.Any(now))
             {
                 _tracker.Reset();
                 return;
@@ -87,7 +103,8 @@ internal sealed class WindowRuleEnforcer : IDisposable
             for (var i = 0; i < fresh.Length; i++)
             {
                 var path = WindowEnumerator.GetImagePath(fresh[i].ProcessId);
-                if (WindowRules.TargetFor(rules, path, windowDesktops[i], desktops) is not { } target)
+                var wanted = _placements.TargetFor(WindowRules.AppName(path), now) ?? WindowRules.Find(rules, path)?.DesktopId;
+                if (WindowRules.MoveTarget(wanted, windowDesktops[i], desktops) is not { } target)
                 {
                     continue;
                 }

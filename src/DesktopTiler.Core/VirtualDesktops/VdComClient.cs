@@ -127,7 +127,8 @@ public sealed class VdComClient : IDisposable
     });
 
     /// <summary>Moves <paramref name="window"/> (any process's) to desktop
-    /// <paramref name="desktopId"/>; the current desktop doesn't change. Throws
+    /// <paramref name="desktopId"/>; the current desktop doesn't change, and if the window had the
+    /// keyboard focus it passes to the current desktop's top window. Throws
     /// <see cref="NotSupportedException"/> if this Windows build doesn't expose the view
     /// collection needed for that, and a COMException (typically E_ACCESSDENIED) for a window
     /// that can't be moved, e.g. an elevated one.</summary>
@@ -529,6 +530,11 @@ public sealed class VdComClient : IDisposable
             throw new InvalidOperationException("This window can't be moved to another desktop.");
         }
 
+        // Windows leaves the keyboard focus on a moved window even though it's now on another
+        // desktop, so typing would go to an invisible window. If it had the focus, hand it to the
+        // top app window left on the current desktop (through the shell window, which gives us the
+        // right to, see ForegroundParking). Callers that follow the window activate it again.
+        var hadFocus = NativeMethods.GetForegroundWindow() == window;
         try
         {
             hr = _vdmi!.MoveViewToDesktop(view, target);
@@ -538,6 +544,51 @@ public sealed class VdComClient : IDisposable
         {
             Marshal.Release(view);
         }
+
+        if (hadFocus)
+        {
+            var next = TopAppWindowOnCurrentDesktop(except: window);
+            var parked = ForegroundParking.Park();
+            if (next != 0)
+            {
+                ForegroundParking.ReleaseTo(parked, next);
+            }
+            else
+            {
+                ForegroundParking.Release(parked);
+            }
+        }
+    }
+
+    /// <summary>The frontmost app window (not minimized) on the current desktop other than
+    /// <paramref name="except"/>, or 0 if there's none. Runs on the STA thread.</summary>
+    private nint TopAppWindowOnCurrentDesktop(nint except)
+    {
+        var ownPid = Environment.ProcessId;
+        var windows = WindowEnumerator.EnumerateZOrder(h =>
+        {
+            try
+            {
+                return IsOnCurrentCore(h);
+            }
+            catch (COMException)
+            {
+                return false;
+            }
+        });
+
+        foreach (var w in windows)
+        {
+            if (w.Handle != except
+                && w.IsOnCurrentVirtualDesktop
+                && !w.IsMinimized
+                && DesktopOccupancy.IsAppWindow(w, ownPid, WindowEnumerator.CmdPalImageName))
+            {
+                return w.Handle;
+            }
+        }
+
+        return 0;
     }
 
     private void ActivateWindowCore(Guid? desktopId, nint window, bool animate)

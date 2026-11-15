@@ -25,10 +25,16 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly WindowRuleStore _ruleStore;
     private readonly WindowRuleEnforcer _ruleEnforcer;
     private readonly WindowRulesPage _windowRulesPage;
+    private readonly WorkspaceStore _workspaceStore;
+    private readonly WorkspaceLauncher _workspaceLauncher;
+    private readonly WorkspacesPage _workspacesPage;
     private readonly AllWindowsPage _allWindowsPage;
     private readonly ListItem _allWindowsBandItem;
     private readonly WrappedDockItem _dockBand;
     private readonly ICommandItem[] _commands;
+
+    // _commands plus one "Open workspace: …" per workspace; rebuilt when the workspaces change.
+    private volatile ICommandItem[] _topLevel;
 
     public DesktopTilerCommandsProvider()
     {
@@ -68,6 +74,13 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _ruleStore = new WindowRuleStore(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsManager.SettingsJsonPath())!, "rules.json"));
         _ruleEnforcer = new WindowRuleEnforcer(_vdClient, _windowWatcher, _ruleStore);
         _windowRulesPage = new WindowRulesPage(_ruleStore, desktopManager);
+
+        // Workspaces: kept in workspaces.json beside rules.json; opening one places windows through
+        // the rule enforcer.
+        WorkspaceStore.Log = SpikeLog.WriteLine;
+        _workspaceStore = new WorkspaceStore(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsManager.SettingsJsonPath())!, "workspaces.json"));
+        _workspaceLauncher = new WorkspaceLauncher(_vdClient, _workspaceStore, _ruleEnforcer);
+        _workspacesPage = new WorkspacesPage(_workspaceStore, _workspaceLauncher, desktopManager);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
         _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore);
@@ -111,6 +124,8 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(desktopManager.DeleteCommand(null, keepOpen: false, "DesktopTiler.desktop.delete", "Delete current desktop")),
             new CommandItem(_manageDesktopsPage) { Subtitle = "Create, rename, reorder and delete desktops" },
             new CommandItem(_windowRulesPage) { Subtitle = "Apps whose new windows open on a chosen desktop" },
+            new CommandItem(new DesktopActionCommand("DesktopTiler.workspace.save", "Save current layout as workspace", WorkspacesPage.SaveIcon, () => _workspaceLauncher.SaveCurrentLayout(keepOpen: false))),
+            new CommandItem(_workspacesPage) { Subtitle = "Open a saved set of apps, each on its own desktop" },
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.MasterStack, "DesktopTiler.tile.masterstack", "Tile: Master-stack")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Columns, "DesktopTiler.tile.columns", "Tile: Columns")),
             new CommandItem(new TileLayoutCommand(_vdClient, _cycle, _tileMemory, _settingsManager, _osd, LayoutKind.Grid, "DesktopTiler.tile.grid", "Tile: Grid")),
@@ -124,9 +139,32 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         ];
 
         Settings = _settingsManager.Settings;
+
+        _topLevel = BuildTopLevel();
+        _workspaceStore.Changed += (_, _) =>
+        {
+            _topLevel = BuildTopLevel();
+            try
+            {
+                RaiseItemsChanged();
+            }
+            catch (Exception ex)
+            {
+                SpikeLog.WriteLine($"Top-level refresh failed: {ex.Message}");
+            }
+        };
     }
 
-    public override ICommandItem[] TopLevelCommands() => _commands;
+    public override ICommandItem[] TopLevelCommands() => _topLevel;
+
+    private ICommandItem[] BuildTopLevel() =>
+    [
+        .. _commands,
+        .. _workspaceStore.Workspaces.Select(w => new CommandItem(WorkspacesPage.OpenCommand(_workspaceLauncher, w, keepOpen: false, topLevel: true))
+        {
+            Subtitle = "Workspace",
+        }),
+    ];
 
     private void ObserveCurrentDesktop()
     {
@@ -147,6 +185,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
 
     public override void Dispose()
     {
+        _workspacesPage.Dispose();
         _ruleEnforcer.Dispose();
         _windowRulesPage.Dispose();
         _manageDesktopsPage.Dispose();

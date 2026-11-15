@@ -56,18 +56,25 @@ public static class WindowRules
     /// <paramref name="windowDesktop"/> should go: the rule's desktop, or null to leave it alone -
     /// no rule, already there, the rule's desktop no longer exists, or the window isn't on one
     /// known desktop (e.g. shown on all of them).</summary>
-    public static Guid? TargetFor(IReadOnlyList<WindowRule> rules, string imagePath, Guid windowDesktop, IReadOnlyCollection<Guid> desktops)
+    public static Guid? TargetFor(IReadOnlyList<WindowRule> rules, string imagePath, Guid windowDesktop, IReadOnlyCollection<Guid> desktops) =>
+        MoveTarget(Find(rules, imagePath)?.DesktopId, windowDesktop, desktops);
+
+    /// <summary>Whether a window on <paramref name="windowDesktop"/> that should be on
+    /// <paramref name="wanted"/> needs moving: <paramref name="wanted"/> if so, null if there's
+    /// nothing wanted, it's already there, <paramref name="wanted"/> no longer exists, or the window
+    /// isn't on one known desktop (e.g. shown on all of them).</summary>
+    public static Guid? MoveTarget(Guid? wanted, Guid windowDesktop, IReadOnlyCollection<Guid> desktops)
     {
         ArgumentNullException.ThrowIfNull(desktops);
-        if (Find(rules, imagePath) is not { } rule
-            || rule.DesktopId == windowDesktop
+        if (wanted is not { } target
+            || target == windowDesktop
             || !Contains(desktops, windowDesktop)
-            || !Contains(desktops, rule.DesktopId))
+            || !Contains(desktops, target))
         {
             return null;
         }
 
-        return rule.DesktopId;
+        return target;
     }
 
     private static bool Contains(IReadOnlyCollection<Guid> desktops, Guid id)

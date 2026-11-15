@@ -124,10 +124,7 @@ public sealed class WindowRuleStore
         {
             var next = change(_rules);
 
-            // Write to a temp file, then swap it in, so a crash mid-write can't leave a torn file.
-            var temp = _path + ".tmp";
-            File.WriteAllText(temp, Serialize(next));
-            File.Move(temp, _path, overwrite: true);
+            AtomicFile.WriteAllText(_path, Serialize(next));
             _rules = next;
         }
 
