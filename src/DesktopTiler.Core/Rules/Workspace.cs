@@ -33,10 +33,11 @@ public static class WorkspaceSnapshot
     /// <param name="desktopsInOrder">The desktops in display order.</param>
     /// <param name="skippedStoreApps">How many windows were left out because they're Store apps,
     /// which can't be started from a path.</param>
+    /// <param name="onlyDesktop">If set, only windows on this desktop are taken.</param>
     /// <returns>One entry per app (its frontmost window decides the desktop), ordered by desktop,
     /// then front to back. Windows on no known desktop (shown on all of them) and windows whose
     /// path can't be read are left out.</returns>
-    public static IReadOnlyList<WorkspaceEntry> FromWindows(IEnumerable<SnapshotWindow> windowsInZOrder, IReadOnlyList<Guid> desktopsInOrder, out int skippedStoreApps)
+    public static IReadOnlyList<WorkspaceEntry> FromWindows(IEnumerable<SnapshotWindow> windowsInZOrder, IReadOnlyList<Guid> desktopsInOrder, out int skippedStoreApps, Guid? onlyDesktop = null)
     {
         ArgumentNullException.ThrowIfNull(windowsInZOrder);
         ArgumentNullException.ThrowIfNull(desktopsInOrder);
@@ -50,7 +51,7 @@ public static class WorkspaceSnapshot
             z++;
             var desktop = IndexOf(desktopsInOrder, w.DesktopId);
             var app = WindowRules.AppName(w.ImagePath);
-            if (desktop < 0 || app.Length == 0)
+            if (desktop < 0 || app.Length == 0 || (onlyDesktop is { } only && w.DesktopId != only))
             {
                 continue;
             }

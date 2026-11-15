@@ -11,7 +11,7 @@ using Microsoft.CommandPalette.Extensions.Toolkit;
 namespace DesktopTiler;
 
 /// <summary>
-/// "Desktop workspaces": a "Save layout as desktop workspace" row, then one row per workspace. Choosing a
+/// "Desktop workspaces": "Save current desktop" and "Save all desktops" rows, then one row per workspace. Choosing a
 /// workspace opens it; its context menu edits its apps, renames it, or deletes it.
 /// </summary>
 internal sealed partial class WorkspacesPage : ListPage, IDisposable
@@ -70,6 +70,15 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
             () => launcher.Open(id, keepOpen));
     }
 
+    /// <summary>"Save current desktop as workspace" / "Save all desktops as workspace"; with a
+    /// stable id when it's the top-level command.</summary>
+    public static DesktopActionCommand SaveCommand(WorkspaceLauncher launcher, bool currentDesktopOnly, bool keepOpen, bool topLevel = false) =>
+        new(
+            topLevel ? (currentDesktopOnly ? "DesktopTiler.workspace.save.current" : "DesktopTiler.workspace.save") : null,
+            currentDesktopOnly ? "Save current desktop as workspace" : "Save all desktops as workspace",
+            SaveIcon,
+            () => launcher.Save(currentDesktopOnly, keepOpen));
+
     /// <summary>"3 apps · desktops 1, 3".</summary>
     internal static string Describe(Workspace workspace, IReadOnlyList<DesktopInfo> desktops)
     {
@@ -98,9 +107,13 @@ internal sealed partial class WorkspacesPage : ListPage, IDisposable
             var desktops = _desktops.ReadDesktops();
             var items = new List<IListItem>
             {
-                new ListItem(new DesktopActionCommand(null, "Save layout as desktop workspace", SaveIcon, () => _launcher.SaveCurrentLayout(keepOpen: true)))
+                new ListItem(SaveCommand(_launcher, currentDesktopOnly: true, keepOpen: true))
                 {
-                    Subtitle = "Every open app with the desktop it's on",
+                    Subtitle = "The apps open on this desktop",
+                },
+                new ListItem(SaveCommand(_launcher, currentDesktopOnly: false, keepOpen: true))
+                {
+                    Subtitle = "Every open app, each with the desktop it's on",
                 },
             };
 

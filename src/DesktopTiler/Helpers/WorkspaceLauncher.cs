@@ -29,16 +29,18 @@ internal sealed class WorkspaceLauncher
         _enforcer = enforcer;
     }
 
-    /// <summary>Saves every open app window, with its desktop, as a new workspace.</summary>
-    public CommandResult SaveCurrentLayout(bool keepOpen)
+    /// <summary>Saves the open app windows, each with its desktop, as a new workspace: those on
+    /// the current desktop only (<paramref name="currentDesktopOnly"/>), or those on every desktop.</summary>
+    public CommandResult Save(bool currentDesktopOnly, bool keepOpen)
     {
         var (windows, ids) = AppWindows();
         var desktops = _vdClient.GetDesktopIdsAsync().WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+        Guid? only = currentDesktopOnly ? _vdClient.GetCurrentIdAsync().WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout) : null;
         var snapshot = windows.Select((w, i) => new SnapshotWindow(WindowEnumerator.GetImagePath(w.ProcessId), ids[i]));
-        var entries = WorkspaceSnapshot.FromWindows(snapshot, desktops, out var skippedStoreApps);
+        var entries = WorkspaceSnapshot.FromWindows(snapshot, desktops, out var skippedStoreApps, only);
         if (entries.Count == 0)
         {
-            return Toast("No apps to save: open some windows first", keepOpen);
+            return Toast(currentDesktopOnly ? "No apps to save on this desktop" : "No apps to save: open some windows first", keepOpen);
         }
 
         var name = WorkspaceSnapshot.DefaultName(_store.Workspaces.Select(w => w.Name));

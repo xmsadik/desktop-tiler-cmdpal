@@ -51,6 +51,22 @@ public class WorkspaceTests
     }
 
     [Fact]
+    public void Snapshot_OnlyDesktop_TakesThatDesktopsWindowsOnly()
+    {
+        SnapshotWindow[] windows =
+        [
+            new(@"C:\a\Code.exe", D3),
+            new(@"C:\b\chrome.exe", D1),
+            new(@"C:\a\code.exe", D1), // Code's frontmost window is elsewhere, but this one is on D1
+            new(@"C:\d\notepad.exe", D2),
+        ];
+
+        var entries = WorkspaceSnapshot.FromWindows(windows, Desktops, out _, onlyDesktop: D1);
+
+        Assert.Equal([new(@"C:\b\chrome.exe", D1), new(@"C:\a\code.exe", D1)], entries);
+    }
+
+    [Fact]
     public void DefaultName_TakesFirstFreeNumber()
     {
         Assert.Equal("Workspace 1", WorkspaceSnapshot.DefaultName([]));
