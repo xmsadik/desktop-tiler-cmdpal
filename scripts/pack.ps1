@@ -14,11 +14,20 @@
 
 .PARAMETER Platform
   x64 or ARM64.
+
+.PARAMETER Install
+  Development shortcut (needs -Sign): raises the third part of the manifest Version first (the
+  same version can't be installed twice), then installs the signed package and restarts Command
+  Palette through scripts\install.ps1.
+
+.EXAMPLE
+  scripts\pack.ps1 -Sign -Install
 #>
 [CmdletBinding()]
 param(
   [ValidateSet('x64', 'ARM64')] [string]$Platform = 'x64',
-  [switch]$Sign
+  [switch]$Sign,
+  [switch]$Install
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,6 +36,31 @@ $project = Join-Path $root 'src\DesktopTiler\DesktopTiler.csproj'
 $dist    = Join-Path $root 'dist'
 [xml]$manifestXml = Get-Content (Join-Path $root 'src\DesktopTiler\Package.appxmanifest')
 $subject = $manifestXml.Package.Identity.Publisher
+
+if ($Install) {
+  if (-not $Sign) { throw '-Install needs -Sign: only a signed package can be installed.' }
+
+  # Raise the build part (a.b.BUILD.0; the Store wants the last part left at 0), past the installed
+  # version too, in case the manifest is behind it. Text replace rather than [xml] save, so the
+  # file's formatting stays exactly as it is.
+  $manifestPath = Join-Path $root 'src\DesktopTiler\Package.appxmanifest'
+  $text = [IO.File]::ReadAllText($manifestPath)
+  $match = [regex]::Match($text, '(<Identity\b[^>]*?\bVersion=")(\d+)\.(\d+)\.(\d+)\.(\d+)"')
+  if (-not $match.Success) { throw "No Identity Version found in $manifestPath" }
+  $old = [version]"$($match.Groups[2].Value).$($match.Groups[3].Value).$($match.Groups[4].Value).$($match.Groups[5].Value)"
+  $build = $old.Build + 1
+  $installed = (Get-AppxPackage -Name $manifestXml.Package.Identity.Name).Version
+  if ($installed) {
+    $installed = [version]$installed
+    if ($installed.Major -eq $old.Major -and $installed.Minor -eq $old.Minor -and $installed.Build -ge $build) {
+      $build = $installed.Build + 1
+    }
+  }
+  $new = "$($old.Major).$($old.Minor).$build.$($old.Revision)"
+  $text = $text.Substring(0, $match.Index) + $match.Groups[1].Value + $new + '"' + $text.Substring($match.Index + $match.Length)
+  [IO.File]::WriteAllText($manifestPath, $text, (New-Object Text.UTF8Encoding $false))
+  Write-Host "Version $old -> $new"
+}
 
 # Start the Release publish from clean intermediates: the trimmed publish's DesktopTiler.deps.json
 # (under obj) isn't regenerated incrementally, so after code starts using a framework assembly the
@@ -73,3 +107,7 @@ if ($Sign) {
 }
 
 Write-Host "Package: $($msix.FullName)"
+
+if ($Install) {
+  & (Join-Path $PSScriptRoot 'install.ps1') -Path $msix.FullName
+}

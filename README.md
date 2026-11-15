@@ -51,6 +51,8 @@ In a normal PowerShell window (or double-click the `.msix` and choose *Install*)
 Add-AppxPackage .\DesktopTiler_<version>_x64.msix
 ```
 
+From a clone of this repository, `.\scripts\install.ps1 -Path .\DesktopTiler_<version>_x64.msix` installs it and also restarts Command Palette the way step 5 needs (see [Troubleshooting](#troubleshooting)).
+
 ### 5. Show it in the Dock
 
 1. Open Command Palette and run **Reload** so it picks up the new extension.
@@ -76,6 +78,7 @@ Get-ChildItem Cert:\LocalMachine\TrustedPeople | Where-Object Subject -eq 'CN=48
 | `0x800B0109` / "the root certificate … is not trusted" on install | Step 3 was skipped or not run as Administrator. |
 | `0x80073CFB` / "a package with the same identity is already installed" | A development build is registered: `Get-AppxPackage ABAPer.DesktopTiler \| Remove-AppxPackage`, then install again. |
 | Band doesn't appear | Check **Enable Dock** is on, run **Reload**, then use **Pin to Dock** as in step 5. |
+| Right after installing or updating, the band is missing or hotkeys do nothing | The first start of new files can be slow (antivirus scanning them); Command Palette stops waiting after 10 s and the extension then loads without its band and hotkeys. Quit Command Palette completely and start it again (a warm start is fast). `scripts\install.ps1` does this for you and checks Command Palette's log that the extension loaded. |
 | Toast says "Unsupported Windows build for desktop switching" | Your Windows build's undocumented virtual-desktop COM layout doesn't match what this extension expects - see [Limitations](#limitations). Wait for an update, or check the project's issues. |
 | A window is reported "skipped (admin)" | The window belongs to an elevated (Run as administrator) process; a non-elevated extension can't move it - see [Limitations](#limitations). |
 | Clicking the band opens the palette instead of the flyout, or it stops updating | Command Palette host issues, see [Known host issues](#known-host-issues). **Reload** fixes both. |
@@ -158,6 +161,15 @@ dotnet test tests\DesktopTiler.Tests -p:Platform=x64      # unit tests
 ```
 
 After deploying, run **Reload** in Command Palette. If the band does not appear by itself, use **Pin to Dock** (see [Installation](#5-show-it-in-the-dock)).
+
+Without Developer Mode, build a signed package and install it in one go:
+
+```powershell
+.\scripts\pack.ps1 -Sign -Install   # raises the manifest version, packs, signs, installs, restarts Command Palette
+.\scripts\install.ps1               # install the newest dist\ package and restart Command Palette
+```
+
+`install.ps1` runs the new `DesktopTiler.exe` once so it gets scanned, restarts Command Palette, then reads Command Palette's log (`%LOCALAPPDATA%\Microsoft\PowerToys\CmdPal\Logs`): if it reports that it gave up waiting for the extension, it restarts Command Palette once more.
 
 ### MSIX package
 
