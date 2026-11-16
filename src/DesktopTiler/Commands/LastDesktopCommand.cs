@@ -31,7 +31,7 @@ internal sealed partial class LastDesktopCommand : InvokableCommand
         using var timing = SpikeLog.Timed(Id);
         try
         {
-            if (_history.Previous is not { } previous)
+            if (_history.Previous is null)
             {
                 return CommandResult.ShowToast("No previous desktop yet");
             }
@@ -42,9 +42,10 @@ internal sealed partial class LastDesktopCommand : InvokableCommand
                 desktops = DesktopListReader.FallbackToVdComClient(_vdClient);
             }
 
-            if (desktops.All(d => d.Id != previous))
+            // If the last used desktop was deleted, the one used before it takes its place.
+            if (_history.PreviousAmong(desktops.Select(d => d.Id)) is not { } previous)
             {
-                return CommandResult.ShowToast("The last used desktop no longer exists");
+                return CommandResult.ShowToast("The desktops used before this one no longer exist");
             }
 
             _vdClient.SwitchAsync(previous, animate: true).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);

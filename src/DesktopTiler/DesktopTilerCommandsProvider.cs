@@ -22,6 +22,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
     private readonly TileMemoryStore _tileMemory;
     private readonly DesktopsPage _desktopsPage;
     private readonly ManageDesktopsPage _manageDesktopsPage;
+    private readonly RecentDesktopsPage _recentDesktopsPage;
     private readonly WindowRuleStore _ruleStore;
     private readonly WindowRuleEnforcer _ruleEnforcer;
     private readonly WindowRulesPage _windowRulesPage;
@@ -70,6 +71,10 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _desktopsPage = new DesktopsPage(_vdClient, _registryReader, _settingsManager, _windowWatcher, _dockLayout);
         _manageDesktopsPage = new ManageDesktopsPage(desktopManager, _vdClient, _registryReader, _desktopsPage);
 
+        // Subscribed after the history (above), so the history has the new current desktop when
+        // the page re-reads its order.
+        _recentDesktopsPage = new RecentDesktopsPage(desktopManager, _vdClient, _registryReader, _desktopsPage, _desktopHistory);
+
         // Window rules: kept in rules.json next to settings.json; the enforcer moves new windows.
         WindowRuleStore.Log = SpikeLog.WriteLine;
         _ruleStore = new WindowRuleStore(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsManager.SettingsJsonPath())!, "rules.json"));
@@ -111,6 +116,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, +1)),
             new CommandItem(new StepDesktopCommand(_vdClient, _registryReader, -1)),
             new CommandItem(new LastDesktopCommand(_vdClient, _registryReader, _desktopHistory)),
+            new CommandItem(_recentDesktopsPage) { Subtitle = "Desktops, most recently used first" },
             .. Enumerable.Range(1, 9).Select(n => new CommandItem(MoveWindowToDesktopCommand.ToNumber(_vdClient, _registryReader, n))),
             new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, +1)),
             new CommandItem(MoveWindowToDesktopCommand.ByStep(_vdClient, _registryReader, -1)),
@@ -191,6 +197,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _ruleEnforcer.Dispose();
         _windowRulesPage.Dispose();
         _manageDesktopsPage.Dispose();
+        _recentDesktopsPage.Dispose();
         _allWindowsPage.Dispose();
         _allWindowsBandPage.Dispose();
         _desktopsPage.Dispose();
