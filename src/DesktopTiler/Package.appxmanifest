@@ -11,7 +11,7 @@
   <Identity
     Name="ABAPer.DesktopTiler"
     Publisher="CN=48947E55-115C-445B-9841-39A5BCF271DD"
-    Version="0.3.44.0" />
+    Version="0.4.0.0" />
 
   <Properties>
     <DisplayName>Desktop Tiler</DisplayName>
@@ -20,8 +20,8 @@
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.26100.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.26100.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
 
   <Resources>
@@ -34,7 +34,7 @@
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
         DisplayName="Desktop Tiler"
-        Description="Virtual desktop switching and one-shot window tiling in the Command Palette Dock"
+        Description="Switch, manage and organize virtual desktops and their windows from the Command Palette Dock"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -57,7 +57,7 @@
             Id="DesktopTiler"
             PublicFolder="Public"
             DisplayName="Desktop Tiler"
-            Description="Virtual desktop switching and one-shot window tiling in the Command Palette Dock">
+            Description="Switch, manage and organize virtual desktops and their windows from the Command Palette Dock">
             <uap3:Properties>
               <CmdPalProvider>
                 <Activation>

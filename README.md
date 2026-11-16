@@ -1,14 +1,33 @@
 # Desktop Tiler for Command Palette
 
-A PowerToys Command Palette extension for switching virtual desktops and tiling windows, one shortcut at a time, from the **Dock**.
+A PowerToys Command Palette extension for working with Windows virtual desktops from the **Dock** and the palette: switch, create, rename, reorder and delete desktops; see and move the windows on every desktop; send an app's new windows to its own desktop; save and restore sets of apps per desktop; and tile windows, one shortcut at a time.
 
 > Unofficial community project. Not affiliated with or endorsed by Microsoft.
 
+![The Desktops band in the Dock: one button per desktop, the current one ringed, and the All windows button at the end](docs/images/dock.png)
+
+![All windows: every window on every desktop, with a window's menu open (move it, show it or its app on all desktops, make a window rule)](docs/images/all-windows.png)
+
+<sub>Rows of the author's own windows are pixelated.</sub>
+
 - **In the Dock:** a *Desktops* band with one button per Windows virtual desktop (`1`, `2`, `3`...), the active one ringed in blue and marked `●` with a bold number, optionally subtitled with the desktop's name. Each button's icon shows whether that desktop has any app windows on it: a filled square if it does, an outlined one if it's empty (minimized windows count). Click a button to switch. Updates live as you switch, add, remove, or rename desktops, and as windows open, close, or move between desktops. The last button (stacked windows icon) opens **All windows**. With a Compact Dock, hovering a desktop button lists the windows on it.
 - **All windows:** every app window on every desktop, grouped by desktop in order, with the desktop number/name and app in the subtitle. Type to filter; pick one to switch to its desktop and bring it to the front. Each row's context menu (right-click or <kbd>Ctrl</kbd>+<kbd>K</kbd>) can bring the window to the current desktop, move it to another desktop, show it on all desktops (or only on one again), show every window of its app on all desktops - including ones opened later, the same as Task View's "Show windows from this app on all desktops", and it works for Store apps too - or close it. Open it from the Dock button or bind a hotkey to it.
-- **Move windows:** `Move window to desktop 1`...`9`, `Move window to next desktop`, `Move window to previous desktop` send the active window to that desktop and keep you where you are; the `... and go` variants take you along and bring the window to the front - bind hotkeys to them (e.g. <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>...<kbd>9</kbd>).
+- **Move windows:** `Move window to desktop 1`...`9`, `Move window to next desktop`, `Move window to previous desktop` send the active window to that desktop and keep you where you are; the `... and go` variants take you along and bring the window to the front - bind hotkeys to them (see [Suggested hotkeys](#suggested-hotkeys)).
 - **Manage desktops:** `New desktop` (and `New desktop and go`), `Rename current desktop`, `Move current desktop left` / `right`, and `Delete current desktop`. The `Manage desktops` page lists every desktop; each row's context menu (<kbd>Ctrl</kbd>+<kbd>K</kbd>) renames, moves or deletes that desktop. Deleting asks first and moves the desktop's windows to its left neighbour (the second desktop if it was the first); the last desktop can't be deleted.
+<table>
+<tr>
+<td><img src="docs/images/recent-desktops.png" alt="Recent desktops: desktops in most-recently-used order"></td>
+<td><img src="docs/images/manage-desktops.png" alt="Manage desktops: create, rename, reorder and delete desktops"></td>
+</tr>
+<tr>
+<td align="center"><code>Recent desktops</code></td>
+<td align="center"><code>Manage desktops</code></td>
+</tr>
+</table>
+
 - **Window rules:** make an app's new windows open on a chosen desktop. In `All windows`, pick **Always open on desktop N** from a window's menu (<kbd>Ctrl</kbd>+<kbd>K</kbd>); the rule follows that desktop even if it's renamed or moved. A ruled window appears briefly where it was opened, then moves (about half a second); you stay where you are, and the keyboard focus stays on your desktop. Windows already open, and windows you later move by hand, are left alone. The `Window rules` page lists the rules: choose one to pick another desktop, or delete it from its menu. Rules match the executable (e.g. `OUTLOOK.EXE`); Store apps all share one host process, so they can't have rules, and windows running as administrator can't be moved.
+![Desktop workspaces: save the open apps per desktop and bring them back](docs/images/desktop-workspaces.png)
+
 - **Desktop workspaces:** `Save current desktop as workspace` saves the apps open on the current desktop; `Save all desktops as workspace` saves every open app with the desktop it's on; `Open desktop workspace: <name>` (one command per workspace, so it can have a hotkey) brings it back. Apps already running have their windows moved to their desktop; the others are started and their new windows moved there as they appear. You stay where you are. The `Desktop workspaces` page opens, renames, edits (change an app's desktop, set the command-line arguments it's started with - e.g. a folder for your editor - or remove an app) and deletes workspaces. Arguments are set by hand from an app's menu (<kbd>Ctrl</kbd>+<kbd>K</kbd>) in `Edit apps`; they're used only when the app is started, not when it's already running. Store apps can't be part of a workspace.
 - **Switch desktops:** `Desktop 1`...`Desktop 9`, `Next desktop`, `Previous desktop`, and `Last used desktop`, which flips between the two most recent desktops (like Alt+Tab; if that desktop was deleted, it goes to the one used before it) - bind hotkeys to them in Command Palette settings. `Recent desktops` lists the desktops most recently used first; choose one to switch to it. The order is kept while the extension runs and starts over when Command Palette restarts.
 - **Tile windows, once:** `Tile: Master-stack`, `Tile: Columns`, `Tile: Grid`, `Tile: Monocle`, `Tile: Center-master` arrange the tileable windows on the focused monitor into that layout. `Tile: Next layout` cycles through them in that order. `Tile: Retile` re-applies whatever you last tiled with, keeping window order - if you clicked a different window first, that window becomes master. `Tile: Rotate` shifts the remembered window order by one step, so the next window in line becomes master; press it repeatedly until the one you want is in the master (or center) slot. After each pass, the layout's name and the result (e.g. **Grid** · *Tiled 4 windows*) flash briefly in the middle of that monitor, on top of the windows just moved; it doesn't take focus and clicks pass through it.
@@ -17,10 +36,12 @@ Tiling is **one-shot, not continuous**: nothing is watched or re-tiled automatic
 
 ## Requirements
 
-- Windows 10 19041+ / Windows 11, PowerToys with Command Palette **0.9 or later** (Dock support)
-- Windows 11 24H2 (build 26100) for virtual desktop switching and tiling - see [Limitations](#limitations)
+- Windows 11 24H2 (build 26100) or later - the package can't be installed on older builds; see [Limitations](#limitations)
+- PowerToys with Command Palette **0.9 or later** (Dock support)
 
 ## Installation
+
+**Microsoft Store:** Desktop Tiler is being submitted to the Microsoft Store; once the listing is live, it will be linked here and installing it there is the easiest way (no certificate, automatic updates). Until then, install it from GitHub as below. Either way, do step 1 first.
 
 ### 1. Turn on the Dock
 
@@ -128,12 +149,16 @@ Bind these in Command Palette → *Settings* → *Commands*:
 
 | Hotkey | Command |
 |---|---|
-| <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>1</kbd>...<kbd>9</kbd> | Desktop 1...9 |
-| <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> | Tile: Next layout |
+| <kbd>Alt</kbd>+<kbd>1</kbd>...<kbd>9</kbd> | Desktop 1...9 |
+| <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd>...<kbd>9</kbd> | Move window to desktop 1...9 |
+| <kbd>Win</kbd>+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>1</kbd>...<kbd>9</kbd> | Move window to desktop 1...9 and go |
 | <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> | Tile: Retile |
 | <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> | Tile: Rotate |
 
-Avoid <kbd>Alt</kbd>+*number* - it collides with browser tab-switching shortcuts globally - and avoid <kbd>Alt</kbd>+<kbd>Shift</kbd> combinations, which Windows uses to switch keyboard layout.
+The first three rows are in daily use on Windows 11 24H2. Some combinations can't be used:
+- <kbd>Win</kbd>+*number* together with only <kbd>Alt</kbd>, <kbd>Ctrl</kbd>, <kbd>Shift</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd> belongs to Windows (taskbar shortcuts): Command Palette can't register it, and its log shows `Failed to register hotkey ... Error: 1409`.
+- <kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> opens Command Palette itself by default.
+- <kbd>Alt</kbd>+*number* is also used by a few apps for their own tabs; the global hotkey wins while it's bound.
 
 ## Settings
 
@@ -184,10 +209,11 @@ Without Developer Mode, build a signed package and install it in one go:
 ## Layout
 
 ```
-src/DesktopTiler/        Command Palette extension (Dock band, commands, settings, Tiler)
-src/DesktopTiler.Core/   Plain .NET library: virtual desktop COM/registry, layouts, window order memory
+src/DesktopTiler/        Command Palette extension (Dock band, pages, commands, settings, Tiler)
+src/DesktopTiler.Core/   Plain .NET library: virtual desktop COM/registry, windows, layouts,
+                         window rules and desktop workspaces (models and storage)
 tests/DesktopTiler.Tests xUnit tests for Core
-scripts/                 dev-deploy.ps1, pack.ps1
+scripts/                 dev-deploy.ps1, pack.ps1, pack-store.ps1, install.ps1, icon generators
 ```
 
 ## Known host issues
@@ -200,7 +226,7 @@ Running **Reload** in Command Palette works around both.
 
 ## Privacy
 
-Desktop Tiler has no network access and collects no data. See [PRIVACY.md](PRIVACY.md).
+Desktop Tiler has no network access and collects no data. The window rules and desktop workspaces you create are saved only on your device, in the extension's own folder. See [PRIVACY.md](PRIVACY.md).
 
 ## License
 
