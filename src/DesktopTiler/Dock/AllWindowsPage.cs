@@ -30,6 +30,7 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
     private static readonly IconInfo CloseIcon = new("\uE8BB"); // ChromeClose
     private static readonly IconInfo PinIcon = new("\uE718"); // Pin
     private static readonly IconInfo UnpinIcon = new("\uE77A"); // Unpin
+    private static readonly IconInfo PinAppIcon = new("\uE840"); // Pinned
 
     // After a move or close from the context menu the page stays open; give the window a moment
     // to actually go before the list is rebuilt.
@@ -133,7 +134,7 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
             items.Add(new ListItem(new ActivateWindowCommand(_vdClient, entry.Desktop?.Id, entry.Handle, _desktopsPage))
             {
                 Title = entry.Title,
-                Subtitle = Describe(entry, currentId),
+                Subtitle = Describe(entry, currentId, pinned[i].App),
                 Icon = entry.ImagePath.Length > 0 ? new IconInfo(entry.ImagePath) : WindowFallbackIcon,
                 MoreCommands = ContextCommands(entry, desktops, currentId, pinned[i]),
             });
@@ -143,13 +144,21 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
     }
 
     /// <summary>The row's context menu: bring the window to this desktop, move it to each other
-    /// desktop, show it on all desktops, close it. A pinned window gets "Show only on this
-    /// desktop" and "Close window"; a window on no known desktop otherwise only "Close window".</summary>
-    private IContextItem[] ContextCommands(WindowListEntry entry, IReadOnlyList<DesktopInfo> desktops, Guid currentId, bool isPinned)
+    /// desktop, show it (or its whole app) on all desktops, close it. A window whose app is shown
+    /// on all desktops gets "Stop showing this app on all desktops" and "Close window"; a pinned
+    /// window gets "Show only on this desktop", "Show this app on all desktops" and "Close window";
+    /// a window on no known desktop otherwise only "Close window".</summary>
+    private IContextItem[] ContextCommands(WindowListEntry entry, IReadOnlyList<DesktopInfo> desktops, Guid currentId, WindowPinState pin)
     {
         var window = entry.Handle;
         var commands = new List<IContextItem>();
-        if (isPinned)
+        if (pin.App)
+        {
+            // The app's pin covers this window too (it reports itself pinned); unpinning just the
+            // window wouldn't take it off the other desktops, so only the app-level undo is offered.
+            commands.Add(new CommandContextItem(AppPinCommand(window, entry.ImagePath, pinned: false)));
+        }
+        else if (pin.Window)
         {
             commands.Add(new CommandContextItem(new WindowActionCommand("Show only on this desktop", UnpinIcon, () =>
             {
@@ -157,6 +166,7 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
                 RefreshSoon();
                 return CommandResult.KeepOpen();
             })));
+            commands.Add(new CommandContextItem(AppPinCommand(window, entry.ImagePath, pinned: true)));
         }
         else if (entry.Desktop is { } own)
         {
@@ -194,6 +204,7 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
                 RefreshSoon();
                 return CommandResult.KeepOpen();
             })));
+            commands.Add(new CommandContextItem(AppPinCommand(window, entry.ImagePath, pinned: true)));
 
             if (RuleCommand(entry.ImagePath, own) is { } rule)
             {
@@ -212,6 +223,28 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
         });
 
         return [.. commands];
+    }
+
+    /// <summary>"Show this app on all desktops" (<paramref name="pinned"/> true) or "Stop showing
+    /// this app on all desktops": Windows' own per-app setting, which also covers the app's windows
+    /// opened later. The toast names the app, which the narrow menu leaves out.</summary>
+    private WindowActionCommand AppPinCommand(nint window, string imagePath, bool pinned)
+    {
+        var app = System.IO.Path.GetFileNameWithoutExtension(imagePath);
+        var name = string.IsNullOrEmpty(app) ? "This app" : app;
+        return new WindowActionCommand(
+            pinned ? "Show this app on all desktops" : "Stop showing this app on all desktops",
+            pinned ? PinAppIcon : UnpinIcon,
+            () =>
+            {
+                _vdClient.SetAppPinnedAsync(window, pinned).WaitOrTimeout(TaskTimeoutExtensions.DefaultTimeout);
+                RefreshSoon();
+                return CommandResult.ShowToast(new ToastArgs
+                {
+                    Message = pinned ? $"{name} windows now show on all desktops" : $"{name} windows now stay on their own desktop",
+                    Result = CommandResult.KeepOpen(),
+                });
+            });
     }
 
     /// <summary>"Always open on desktop N" (makes or retargets the window's app's rule), or
@@ -273,7 +306,7 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
         },
         System.Threading.Tasks.TaskScheduler.Default);
 
-    private string Describe(WindowListEntry entry, Guid currentId)
+    private string Describe(WindowListEntry entry, Guid currentId, bool appPinned)
     {
         var app = System.IO.Path.GetFileNameWithoutExtension(entry.ImagePath);
         string where;
@@ -287,7 +320,7 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
         }
         else
         {
-            where = "All desktops";
+            where = appPinned ? "All desktops (whole app)" : "All desktops";
         }
 
         return string.IsNullOrEmpty(app) ? where : $"{where} · {app}";

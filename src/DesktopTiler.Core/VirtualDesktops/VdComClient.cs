@@ -138,14 +138,24 @@ public sealed class VdComClient : IDisposable
         return true;
     });
 
-    /// <summary>Whether each of <paramref name="windows"/> is shown on all desktops (same
-    /// order), in one STA hop. A window whose state can't be read counts as not pinned. All false
-    /// if this build doesn't expose the pinned-apps service.</summary>
-    public Task<IReadOnlyList<bool>> GetWindowsPinnedAsync(IReadOnlyList<nint> windows)
+    /// <summary>For each of <paramref name="windows"/> (same order), in one STA hop: whether the
+    /// window itself is shown on all desktops, and whether its whole app is. A state that can't be
+    /// read counts as not pinned; all false if this build doesn't expose the pinned-apps service.</summary>
+    public Task<IReadOnlyList<WindowPinState>> GetWindowsPinnedAsync(IReadOnlyList<nint> windows)
     {
         ArgumentNullException.ThrowIfNull(windows);
-        return RunAsync<IReadOnlyList<bool>>(() => GetWindowsPinnedCore(windows));
+        return RunAsync<IReadOnlyList<WindowPinState>>(() => GetWindowsPinnedCore(windows));
     }
+
+    /// <summary>Shows every window of <paramref name="window"/>'s app, open now or later, on all
+    /// desktops (<paramref name="pinned"/> true), or stops doing so - Windows' own "Show windows
+    /// from this app on all desktops". Throws <see cref="NotSupportedException"/> if this build
+    /// doesn't expose the services needed.</summary>
+    public Task SetAppPinnedAsync(nint window, bool pinned) => RunAsync(() =>
+    {
+        SetAppPinnedCore(window, pinned);
+        return true;
+    });
 
     /// <summary>Shows <paramref name="window"/> on all desktops (<paramref name="pinned"/> true)
     /// or only on its current one. Throws <see cref="NotSupportedException"/> if this build
@@ -452,10 +462,10 @@ public sealed class VdComClient : IDisposable
         }
     }
 
-    private bool[] GetWindowsPinnedCore(IReadOnlyList<nint> windows)
+    private WindowPinState[] GetWindowsPinnedCore(IReadOnlyList<nint> windows)
     {
         EnsureInternalConnected();
-        var result = new bool[windows.Count];
+        var result = new WindowPinState[windows.Count];
         if (_views is null || _pinnedApps is null)
         {
             return result;
@@ -470,7 +480,22 @@ public sealed class VdComClient : IDisposable
 
             try
             {
-                result[i] = _pinnedApps.IsViewPinned(view, out var pinned) >= 0 && pinned != 0;
+                var windowPinned = _pinnedApps.IsViewPinned(view, out var pinned) >= 0 && pinned != 0;
+                var appPinned = false;
+                var appId = AppIdOf(view);
+                if (appId != 0)
+                {
+                    try
+                    {
+                        appPinned = _pinnedApps.IsAppIdPinned(appId, out var app) >= 0 && app != 0;
+                    }
+                    finally
+                    {
+                        Marshal.FreeCoTaskMem(appId);
+                    }
+                }
+
+                result[i] = new WindowPinState(windowPinned, appPinned);
             }
             finally
             {
@@ -511,6 +536,87 @@ public sealed class VdComClient : IDisposable
         finally
         {
             Marshal.Release(view);
+        }
+    }
+
+    private void SetAppPinnedCore(nint window, bool pinned)
+    {
+        EnsureInternalConnected();
+        if (_views is null || _pinnedApps is null)
+        {
+            throw new NotSupportedException("Showing apps on all desktops isn't supported on this Windows build.");
+        }
+
+        var hr = _views.GetViewForHwnd(window, out var view);
+        ThrowIfFailed(hr, "GetViewForHwnd");
+        if (view == 0)
+        {
+            throw new InvalidOperationException("This window's app can't be shown on all desktops.");
+        }
+
+        nint appId;
+        try
+        {
+            appId = AppIdOf(view);
+        }
+        finally
+        {
+            Marshal.Release(view);
+        }
+
+        if (appId == 0)
+        {
+            throw new InvalidOperationException("This window's app can't be identified, so it can't be shown on all desktops.");
+        }
+
+        try
+        {
+            hr = _pinnedApps.IsAppIdPinned(appId, out var current);
+            ThrowIfFailed(hr, "IsAppIdPinned");
+            if ((current != 0) == pinned)
+            {
+                return; // already in the requested state
+            }
+
+            hr = pinned ? _pinnedApps.PinAppID(appId) : _pinnedApps.UnpinAppID(appId);
+            ThrowIfFailed(hr, pinned ? "PinAppID" : "UnpinAppID");
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(appId);
+        }
+    }
+
+    /// <summary>The AppUserModelID of <paramref name="view"/> (a raw IApplicationView pointer
+    /// the caller still owns) as a CoTaskMemAlloc'd PWSTR the caller frees, or 0 if it has none
+    /// or can't be read.</summary>
+    private static nint AppIdOf(nint view)
+    {
+        var iid = typeof(IApplicationView).GUID;
+        if (Marshal.QueryInterface(view, in iid, out var ptr) < 0 || ptr == 0)
+        {
+            return 0;
+        }
+
+        var applicationView = WrapAndRelease<IApplicationView>(ptr);
+        try
+        {
+            if (applicationView.GetAppUserModelId(out var id) < 0 || id == 0)
+            {
+                return 0;
+            }
+
+            if (Marshal.ReadInt16(id) == 0)
+            {
+                Marshal.FreeCoTaskMem(id); // empty id
+                return 0;
+            }
+
+            return id;
+        }
+        finally
+        {
+            ((object)applicationView as ComObject)?.FinalRelease();
         }
     }
 

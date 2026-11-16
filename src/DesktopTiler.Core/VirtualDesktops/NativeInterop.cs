@@ -226,6 +226,43 @@ internal partial interface IApplicationViewCollection
     int GetViewForHwnd(nint hwnd, out nint view);
 }
 
+/// <summary>Undocumented application view (one per top-level window), as handed out by
+/// <see cref="IApplicationViewCollection.GetViewForHwnd"/>. An IInspectable, so its three methods
+/// come first; only GetAppUserModelId is called, the slots before it keep the vtable layout.
+/// Layout per Windows 11 24H2 (MScholtes VirtualDesktop11-24H2).</summary>
+[GeneratedComInterface]
+[Guid("372E1D3B-38D3-42E4-A15B-8AB2B178F513")]
+internal partial interface IApplicationView
+{
+    [PreserveSig] int GetIids(out int count, out nint iids); // IInspectable
+    [PreserveSig] int GetRuntimeClassName(out nint className); // IInspectable
+    [PreserveSig] int GetTrustLevel(out int trustLevel); // IInspectable
+    [PreserveSig] int SetFocus();
+    [PreserveSig] int SwitchTo();
+    [PreserveSig] int TryInvokeBack(nint callback);
+    [PreserveSig] int GetThumbnailWindow(out nint hwnd);
+    [PreserveSig] int GetMonitor(out nint immersiveMonitor);
+    [PreserveSig] int GetVisibility(out int visibility);
+    [PreserveSig] int SetCloak(int cloakType, int unknown);
+    [PreserveSig] int GetPosition(in Guid guid, out nint position);
+    [PreserveSig] int SetPosition(nint position);
+    [PreserveSig] int InsertAfterWindow(nint hwnd);
+    [PreserveSig] int GetExtendedFramePosition(out ViewFrameRect rect);
+
+    /// <summary>The view's app id, a CoTaskMemAlloc'd PWSTR the caller frees.</summary>
+    [PreserveSig] int GetAppUserModelId(out nint id);
+}
+
+/// <summary>A Win32 RECT, for <see cref="IApplicationView.GetExtendedFramePosition"/>'s slot.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct ViewFrameRect
+{
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+}
+
 /// <summary>Undocumented "show this window / app on all desktops". Only the per-view members are
 /// used (with views from <see cref="IApplicationViewCollection.GetViewForHwnd"/>); the app-id
 /// ones are placeholders that keep the vtable layout. Obtained through QueryService with
@@ -235,14 +272,16 @@ internal partial interface IApplicationViewCollection
 [Guid("4CE81583-1E4C-4632-A621-07A53543148F")]
 internal partial interface IVirtualDesktopPinnedApps
 {
+    // appId is a PCWSTR (an AppUserModelID from IApplicationView.GetAppUserModelId), passed as a
+    // raw pointer the caller pins - same approach as the HSTRING in SetDesktopName.
     [PreserveSig]
-    int IsAppIdPinned(nint appId, out int pinned); // unused placeholder
+    int IsAppIdPinned(nint appId, out int pinned);
 
     [PreserveSig]
-    int PinAppID(nint appId); // unused placeholder
+    int PinAppID(nint appId);
 
     [PreserveSig]
-    int UnpinAppID(nint appId); // unused placeholder
+    int UnpinAppID(nint appId);
 
     [PreserveSig]
     int IsViewPinned(nint view, out int pinned);
