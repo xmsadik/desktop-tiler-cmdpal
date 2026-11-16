@@ -43,16 +43,18 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
     private readonly DesktopsPage _desktopsPage;
     private readonly SettingsManager _settingsManager;
     private readonly WindowRuleStore _rules;
+    private readonly WindowEventWatcher _windowWatcher;
 
     /// <param name="name">The command name. The Dock button passes an empty one: with no title the
     /// Dock falls back to showing the name, and that button should be icon-only.</param>
-    public AllWindowsPage(VdComClient vdClient, RegistryDesktopReader registryReader, DesktopsPage desktopsPage, SettingsManager settingsManager, WindowRuleStore rules, string name = "All windows")
+    public AllWindowsPage(VdComClient vdClient, RegistryDesktopReader registryReader, DesktopsPage desktopsPage, SettingsManager settingsManager, WindowRuleStore rules, WindowEventWatcher windowWatcher, string name = "All windows")
     {
         _vdClient = vdClient;
         _registryReader = registryReader;
         _desktopsPage = desktopsPage;
         _settingsManager = settingsManager;
         _rules = rules;
+        _windowWatcher = windowWatcher;
 
         Id = "DesktopTiler.windows";
         Name = name;
@@ -61,9 +63,17 @@ internal sealed partial class AllWindowsPage : ListPage, IDisposable
         PlaceholderText = "Search windows on all desktops";
 
         _desktopsPage.Refreshed += OnDesktopsRefreshed;
+
+        // Titles change without any window coming, going or moving, so DesktopsPage.Refreshed
+        // doesn't cover them; the watcher reports them separately, at most once a second.
+        _windowWatcher.TitleChanged += OnDesktopsRefreshed;
     }
 
-    public void Dispose() => _desktopsPage.Refreshed -= OnDesktopsRefreshed;
+    public void Dispose()
+    {
+        _desktopsPage.Refreshed -= OnDesktopsRefreshed;
+        _windowWatcher.TitleChanged -= OnDesktopsRefreshed;
+    }
 
     public override IListItem[] GetItems()
     {

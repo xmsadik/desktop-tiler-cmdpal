@@ -12,6 +12,10 @@ namespace DesktopTiler.Core.Windows;
 /// cloak/uncloak (the shell cloaks a window when it moves off the current desktop), not on
 /// polling.
 ///
+/// Title changes are reported separately, through <see cref="TitleChanged"/>: they're far more
+/// frequent (a terminal's progress, a browser's tab) and only matter to lists that show titles,
+/// not to desktop occupancy or the Dock.
+///
 /// Out-of-context hook callbacks are delivered through the message queue of the thread that
 /// installed the hook, so a dedicated background thread installs both hooks and then just pumps
 /// <c>GetMessage</c> until <see cref="Dispose"/> posts it WM_QUIT.
@@ -21,6 +25,9 @@ public sealed class WindowEventWatcher : IDisposable
     /// <summary>Burst window: opening one app typically produces several show/cloak events.</summary>
     public static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(300);
 
+    /// <summary>At most one <see cref="TitleChanged"/> per this long, however often titles change.</summary>
+    public static readonly TimeSpan TitleDelay = TimeSpan.FromSeconds(1);
+
     // The hook callback must be a static [UnmanagedCallersOnly] method (trim/AOT-safe, no
     // delegate marshalling). It always runs on the hook thread, so a [ThreadStatic] is enough to
     // route it back to the owning instance.
@@ -28,6 +35,7 @@ public sealed class WindowEventWatcher : IDisposable
     private static WindowEventWatcher? t_current;
 
     private readonly Debouncer _debouncer;
+    private readonly Debouncer _titleDebouncer;
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _ready = new(false);
     private uint _threadId;
@@ -40,6 +48,7 @@ public sealed class WindowEventWatcher : IDisposable
         // COM round-trip) Changed handlers off to the thread pool rather than letting them stall
         // this thread's message pump, and with it WinEvent delivery and Dispose().
         _debouncer = new Debouncer(DebounceDelay, () => ThreadPool.QueueUserWorkItem(static w => w.Changed?.Invoke(w, EventArgs.Empty), this, preferLocal: false));
+        _titleDebouncer = new Debouncer(TitleDelay, () => ThreadPool.QueueUserWorkItem(static w => w.TitleChanged?.Invoke(w, EventArgs.Empty), this, preferLocal: false), extendOnSignal: false);
         _thread = new Thread(Run) { IsBackground = true, Name = "DesktopTiler.WindowEventWatcher" };
         _thread.Start();
         _ready.Wait();
@@ -47,6 +56,10 @@ public sealed class WindowEventWatcher : IDisposable
 
     /// <summary>Raised on a thread-pool thread, at most once per <see cref="DebounceDelay"/> burst.</summary>
     public event EventHandler? Changed;
+
+    /// <summary>Raised on a thread-pool thread when the title of a visible top-level app window
+    /// changed; at most once per <see cref="TitleDelay"/>.</summary>
+    public event EventHandler? TitleChanged;
 
     public void Dispose()
     {
@@ -62,6 +75,7 @@ public sealed class WindowEventWatcher : IDisposable
         }
 
         _debouncer.Dispose();
+        _titleDebouncer.Dispose();
         _ready.Dispose();
     }
 
@@ -78,6 +92,8 @@ public sealed class WindowEventWatcher : IDisposable
             NativeMethods.EventObjectDestroy, NativeMethods.EventObjectHide, 0, &OnWinEvent, 0, 0, flags);
         var cloak = NativeMethods.SetWinEventHook(
             NativeMethods.EventObjectCloaked, NativeMethods.EventObjectUncloaked, 0, &OnWinEvent, 0, 0, flags);
+        var nameChange = NativeMethods.SetWinEventHook(
+            NativeMethods.EventObjectNameChange, NativeMethods.EventObjectNameChange, 0, &OnWinEvent, 0, 0, flags);
 
         _threadId = NativeMethods.GetCurrentThreadId();
         _ready.Set();
@@ -102,6 +118,11 @@ public sealed class WindowEventWatcher : IDisposable
                 NativeMethods.UnhookWinEvent(cloak);
             }
 
+            if (nameChange != 0)
+            {
+                NativeMethods.UnhookWinEvent(nameChange);
+            }
+
             t_current = null;
         }
     }
@@ -113,6 +134,17 @@ public sealed class WindowEventWatcher : IDisposable
         {
             if (idObject != NativeMethods.ObjIdWindow || idChild != 0 || !IsRelevantWindow(hwnd))
             {
+                return;
+            }
+
+            if (eventType == NativeMethods.EventObjectNameChange)
+            {
+                // A window that's gone or hidden has no title anyone sees.
+                if (NativeMethods.IsWindowVisible(hwnd))
+                {
+                    t_current?._titleDebouncer.Signal();
+                }
+
                 return;
             }
 

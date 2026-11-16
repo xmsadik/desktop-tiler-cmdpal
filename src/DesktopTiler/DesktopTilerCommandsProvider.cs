@@ -84,14 +84,14 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         _workspacesPage = new WorkspacesPage(_workspaceStore, _workspaceLauncher, desktopManager);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).
-        _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore);
+        _allWindowsPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore, _windowWatcher);
 
         // The last button of the band opens the "All windows" list: icon plus an "All windows" subtitle,
         // which the Dock shows in default size and hides in compact size, like the desktop names. The
         // title is a zero-width space: with an empty title the Dock centres the subtitle on one line, while a
         // (blank) title keeps the two-line layout of the desktop buttons, subtitle at the bottom. Its own page
         // instance has an empty command name (see AllWindowsPage's name parameter).
-        _allWindowsBandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
+        _allWindowsBandPage = new AllWindowsPage(_vdClient, _registryReader, _desktopsPage, _settingsManager, _ruleStore, _windowWatcher, name: string.Empty) { Id = "DesktopTiler.windows.dock" };
         _allWindowsBandItem = new ListItem(_allWindowsBandPage) { Title = "\u200B", Subtitle = "All windows", Icon = _allWindowsBandPage.Icon };
 
         _dockBand = new WrappedDockItem(BandItems(), "DesktopTiler.dock.desktops", "Desktops");

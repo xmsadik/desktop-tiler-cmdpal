@@ -76,6 +76,29 @@ public class DebouncerTests
     }
 
     [Fact]
+    public void WithoutExtend_SignalsDontMoveTheDueTime_UntilItFires()
+    {
+        var provider = new ManualTimeProvider();
+        var fired = 0;
+        using var debouncer = new Debouncer(TimeSpan.FromSeconds(1), () => fired++, provider, extendOnSignal: false);
+
+        debouncer.Signal();
+        debouncer.Signal();
+        debouncer.Signal();
+        Assert.Single(provider.ChangeCalls); // a steady stream can't starve the callback
+
+        provider.Fire();
+        Assert.Equal(1, fired);
+
+        debouncer.Signal(); // a change after the firing starts a new window
+        debouncer.Signal();
+        Assert.Equal(2, provider.ChangeCalls.Count);
+
+        provider.Fire();
+        Assert.Equal(2, fired);
+    }
+
+    [Fact]
     public void Fire_AfterOneOrMoreSignals_InvokesCallbackExactlyOnce()
     {
         var provider = new ManualTimeProvider();

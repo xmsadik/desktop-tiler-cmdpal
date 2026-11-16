@@ -21,34 +21,44 @@ public sealed class Debouncer : IDisposable
     // and, as a side effect, also stops a post-Dispose Signal() from throwing
     // ObjectDisposedException by re-arming an already-disposed timer.
     private readonly object _gate = new();
+    private readonly bool _extendOnSignal;
+    private bool _armed;
     private bool _disposed;
 
-    public Debouncer(TimeSpan delay, Action onFire)
-        : this(delay, onFire, TimeProvider.System)
+    public Debouncer(TimeSpan delay, Action onFire, bool extendOnSignal = true)
+        : this(delay, onFire, TimeProvider.System, extendOnSignal)
     {
     }
 
-    public Debouncer(TimeSpan delay, Action onFire, TimeProvider timeProvider)
+    /// <param name="extendOnSignal">True (the default): every signal pushes the due time back
+    /// out, so a burst fires once, after it ends - but a source that never goes quiet never fires.
+    /// False: the first signal sets the due time and later ones don't move it, so a steady stream
+    /// of signals fires at most once per <paramref name="delay"/> (each firing covers every
+    /// signal before it).</param>
+    public Debouncer(TimeSpan delay, Action onFire, TimeProvider timeProvider, bool extendOnSignal = true)
     {
         ArgumentNullException.ThrowIfNull(onFire);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _delay = delay;
         _onFire = onFire;
+        _extendOnSignal = extendOnSignal;
         _timer = timeProvider.CreateTimer(_ => Fire(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
-    /// <summary>(re)starts the delay window. Only the last call in a burst actually fires the
-    /// callback, since each call pushes the due time back out.</summary>
+    /// <summary>(Re)starts the delay window: only the last call in a burst actually fires the
+    /// callback, since each call pushes the due time back out. Without extendOnSignal, only starts
+    /// it if it isn't already running.</summary>
     public void Signal()
     {
         lock (_gate)
         {
-            if (_disposed)
+            if (_disposed || (_armed && !_extendOnSignal))
             {
                 return;
             }
 
+            _armed = true;
             _timer.Change(_delay, Timeout.InfiniteTimeSpan);
         }
     }
@@ -76,6 +86,7 @@ public sealed class Debouncer : IDisposable
                 return;
             }
 
+            _armed = false;
             _onFire();
         }
     }

@@ -35,6 +35,7 @@ internal static partial class NativeMethods
     internal const uint EventObjectHide = 0x8003;
     internal const uint EventObjectCloaked = 0x8017;
     internal const uint EventObjectUncloaked = 0x8018;
+    internal const uint EventObjectNameChange = 0x800C;
     internal const uint WinEventOutOfContext = 0x0000;
     internal const uint WinEventSkipOwnProcess = 0x0002;
     internal const int ObjIdWindow = 0;

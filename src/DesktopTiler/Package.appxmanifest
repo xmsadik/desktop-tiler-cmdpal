@@ -11,7 +11,7 @@
   <Identity
     Name="ABAPer.DesktopTiler"
     Publisher="CN=48947E55-115C-445B-9841-39A5BCF271DD"
-    Version="0.3.42.0" />
+    Version="0.3.43.0" />
 
   <Properties>
     <DisplayName>Desktop Tiler</DisplayName>
