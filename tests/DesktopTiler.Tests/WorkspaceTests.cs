@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using DesktopTiler.Core.Rules;
 using Xunit;
 
@@ -125,6 +126,87 @@ public class WorkspaceTests
 
             store.Remove(id);
             Assert.Empty(new WorkspaceStore(path).Workspaces);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Arguments_RoundTrip_AndAreOmittedWhenEmpty()
+    {
+        Workspace[] all =
+        [
+            new(Guid.NewGuid(), "Args", [new(@"C:\a\Code.exe", D1, @"""C:\Projects\My app"" --new-window"), new(@"C:\b\y.exe", D2)]),
+        ];
+
+        var json = WorkspaceStore.Serialize(all);
+
+        Assert.Equal(all, WorkspaceStore.Parse(json));
+        Assert.Equal(1, json.Split("\"args\"").Length - 1); // only the entry that has arguments
+    }
+
+    [Fact]
+    public void Parse_FileWithoutArguments_GivesEmptyArguments()
+    {
+        var id = Guid.NewGuid();
+        var json = $$"""
+            { "workspaces": [ { "id": "{{id}}", "name": "Old", "apps": [
+                { "path": "C:\\a.exe", "desktop": "{{D1}}" },
+                { "path": "C:\\b.exe", "desktop": "{{D1}}", "args": "  -x  " },
+                { "path": "C:\\c.exe", "desktop": "{{D1}}", "args": 5 } ] } ] }
+            """;
+
+        var ws = Assert.Single(WorkspaceStore.Parse(json));
+
+        Assert.Equal(["", "-x", ""], ws.Entries.Select(e => e.Arguments));
+    }
+
+    [Fact]
+    public void Store_SetEntryArguments_PersistsAndKeepsDesktop()
+    {
+        var dir = Directory.CreateTempSubdirectory("dt-ws-");
+        try
+        {
+            var path = Path.Combine(dir.FullName, "workspaces.json");
+            var store = new WorkspaceStore(path);
+            var id = Guid.NewGuid();
+            store.Add(new Workspace(id, "A", [new(@"C:\a\Code.exe", D1), new(@"C:\b\chrome.exe", D2)]));
+
+            store.SetEntryArguments(id, "CODE.EXE", "  C:\\work  ");
+            store.SetEntryDesktop(id, "code.exe", D3);
+
+            Assert.Equal(
+                new Workspace(id, "A", [new(@"C:\a\Code.exe", D3, @"C:\work"), new(@"C:\b\chrome.exe", D2)]),
+                new WorkspaceStore(path).Find(id));
+
+            store.SetEntryArguments(id, "code.exe", "   ");
+            Assert.Equal(string.Empty, new WorkspaceStore(path).Find(id)!.Entries[0].Arguments);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ShellLink_WritesShortcutFile()
+    {
+        var dir = Directory.CreateTempSubdirectory("dt-lnk-");
+        try
+        {
+            var link = Path.Combine(dir.FullName, "sub", "t.lnk");
+            var target = Path.Combine(Environment.SystemDirectory, "notepad.exe");
+
+            Core.Windows.ShellLink.Write(link, target, @"""C:\x y\z.txt""", Environment.SystemDirectory);
+            Core.Windows.ShellLink.Write(link, target, "-again", Environment.SystemDirectory); // replaces
+
+            var bytes = File.ReadAllBytes(link);
+            Assert.Equal(0x4C, bytes[0]); // shell link header size, the .lnk signature
+            static int Find(byte[] haystack, string s) => haystack.AsSpan().IndexOf(System.Text.Encoding.Unicode.GetBytes(s));
+            Assert.True(Find(bytes, "-again") > 0); // strings are stored as UTF-16
+            Assert.True(Find(bytes, "z.txt") < 0);
         }
         finally
         {

@@ -258,12 +258,17 @@ internal sealed partial class WorkspaceEditPage : ListPage, IDisposable
                         _store.RemoveEntry(_workspaceId, app);
                         return CommandResult.KeepOpen();
                     });
+                    var started = e.Arguments.Length > 0 ? $"{e.ImagePath} {e.Arguments}" : e.ImagePath;
                     return new ListItem(new EntryDesktopPage(_store, _desktops, _workspaceId, e))
                     {
                         Title = Path.GetFileNameWithoutExtension(app),
-                        Subtitle = $"Opens on {where} · {e.ImagePath}",
+                        Subtitle = $"Opens on {where} · {started}",
                         Icon = File.Exists(e.ImagePath) ? new IconInfo(e.ImagePath) : AppFallbackIcon,
-                        MoreCommands = [new CommandContextItem(remove) { IsCritical = true }],
+                        MoreCommands =
+                        [
+                            new CommandContextItem(new EntryArgumentsPage(_store, _workspaceId, app)),
+                            new CommandContextItem(remove) { IsCritical = true },
+                        ],
                     };
                 }),
             ];
@@ -335,6 +340,54 @@ internal sealed partial class EntryDesktopPage : ListPage
             SpikeLog.WriteLine($"EntryDesktopPage.GetItems failed: {ex}");
             return [new ListItem { Title = "Desktop list unavailable" }];
         }
+    }
+}
+
+/// <summary>"Set arguments": a <see cref="NameForm"/> with the command-line arguments one app of a
+/// workspace is started with. Empty means none.</summary>
+internal sealed partial class EntryArgumentsPage : ContentPage
+{
+    // A shortcut's arguments are limited to INFOTIPSIZE (1024) characters.
+    private const int MaxArgumentsLength = 1024;
+
+    private readonly WorkspaceStore _store;
+    private readonly Guid _workspaceId;
+    private readonly string _app;
+
+    public EntryArgumentsPage(WorkspaceStore store, Guid workspaceId, string app)
+    {
+        _store = store;
+        _workspaceId = workspaceId;
+        _app = app;
+        Name = "Set arguments";
+        Title = $"Arguments for {Path.GetFileNameWithoutExtension(app)}";
+        Icon = new IconInfo(""); // CommandPrompt
+    }
+
+    public override IContent[] GetContent()
+    {
+        var entry = _store.Find(_workspaceId)?.Entries.FirstOrDefault(e => string.Equals(e.App, _app, StringComparison.OrdinalIgnoreCase));
+        if (entry is null)
+        {
+            return [new MarkdownContent("This app is no longer in the workspace.")];
+        }
+
+        return
+        [
+            new NameForm(
+                "DesktopTiler.workspace.arguments",
+                $"Start {Path.GetFileNameWithoutExtension(_app)} with these arguments when the workspace opens (e.g. a file or folder; quote paths with spaces). Leave empty for none.",
+                entry.Arguments,
+                @"""C:\Projects\My folder""",
+                MaxArgumentsLength,
+                text =>
+                {
+                    var trimmed = text?.Trim() ?? string.Empty;
+                    _store.SetEntryArguments(_workspaceId, _app, trimmed.Length > MaxArgumentsLength ? trimmed[..MaxArgumentsLength] : trimmed);
+                    return CommandResult.GoBack();
+                },
+                label: "Arguments"),
+        ];
     }
 }
 

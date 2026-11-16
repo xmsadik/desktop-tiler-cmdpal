@@ -80,7 +80,7 @@ public partial class DesktopTilerCommandsProvider : CommandProvider
         // the rule enforcer.
         WorkspaceStore.Log = SpikeLog.WriteLine;
         _workspaceStore = new WorkspaceStore(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsManager.SettingsJsonPath())!, "workspaces.json"));
-        _workspaceLauncher = new WorkspaceLauncher(_vdClient, _workspaceStore, _ruleEnforcer);
+        _workspaceLauncher = new WorkspaceLauncher(_vdClient, _workspaceStore, _ruleEnforcer, System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsManager.SettingsJsonPath())!, "launch"));
         _workspacesPage = new WorkspacesPage(_workspaceStore, _workspaceLauncher, desktopManager);
 
         // Command.Id must be non-empty or the host silently drops the band (see claude-tasks-cmdpal).

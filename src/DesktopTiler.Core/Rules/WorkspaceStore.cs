@@ -57,6 +57,10 @@ public sealed class WorkspaceStore
     public void SetEntryDesktop(Guid id, string app, Guid desktopId) =>
         Change(id, w => w with { Entries = [.. w.Entries.Select(e => SameApp(e, app) ? e with { DesktopId = desktopId } : e)] });
 
+    /// <summary>Sets the arguments <paramref name="app"/> is started with (trimmed; empty for none).</summary>
+    public void SetEntryArguments(Guid id, string app, string arguments) =>
+        Change(id, w => w with { Entries = [.. w.Entries.Select(e => SameApp(e, app) ? e with { Arguments = arguments.Trim() } : e)] });
+
     public void RemoveEntry(Guid id, string app) =>
         Change(id, w => w with { Entries = [.. w.Entries.Where(e => !SameApp(e, app))] });
 
@@ -88,7 +92,9 @@ public sealed class WorkspaceStore
                         && TryGetString(e, "path", out var path) && !string.IsNullOrWhiteSpace(path)
                         && TryGetString(e, "desktop", out var desktopText) && Guid.TryParse(desktopText, out var desktop))
                     {
-                        entries.Add(new WorkspaceEntry(path, desktop));
+                        // "args" is optional: files written before it existed have none.
+                        var args = TryGetString(e, "args", out var a) ? a.Trim() : string.Empty;
+                        entries.Add(new WorkspaceEntry(path, desktop, args));
                     }
                 }
             }
@@ -119,6 +125,11 @@ public sealed class WorkspaceStore
                     w.WriteStartObject();
                     w.WriteString("path", e.ImagePath);
                     w.WriteString("desktop", e.DesktopId.ToString("D"));
+                    if (e.Arguments.Length > 0)
+                    {
+                        w.WriteString("args", e.Arguments);
+                    }
+
                     w.WriteEndObject();
                 }
 

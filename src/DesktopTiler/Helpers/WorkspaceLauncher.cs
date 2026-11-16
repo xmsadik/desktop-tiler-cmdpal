@@ -21,12 +21,16 @@ internal sealed class WorkspaceLauncher
     private readonly VdComClient _vdClient;
     private readonly WorkspaceStore _store;
     private readonly WindowRuleEnforcer _enforcer;
+    private readonly string _shortcutFolder;
 
-    public WorkspaceLauncher(VdComClient vdClient, WorkspaceStore store, WindowRuleEnforcer enforcer)
+    /// <param name="shortcutFolder">Where the shortcuts for apps with arguments are written. Must
+    /// be a real path Explorer can see (the package's LocalState, not a redirected AppData path).</param>
+    public WorkspaceLauncher(VdComClient vdClient, WorkspaceStore store, WindowRuleEnforcer enforcer, string shortcutFolder)
     {
         _vdClient = vdClient;
         _store = store;
         _enforcer = enforcer;
+        _shortcutFolder = shortcutFolder;
     }
 
     /// <summary>Saves the open app windows, each with its desktop, as a new workspace: those on
@@ -121,7 +125,7 @@ internal sealed class WorkspaceLauncher
             try
             {
                 _enforcer.PlaceNextWindows(entry.App, entry.DesktopId);
-                Start(entry.ImagePath);
+                Start(workspace.Id, entry);
                 started++;
             }
             catch (Exception ex)
@@ -143,11 +147,20 @@ internal sealed class WorkspaceLauncher
 
     /// <summary>Starts the app through Explorer rather than as our own child process. A child of
     /// this (packaged) extension would belong to its package, and Windows ends a package's
-    /// processes when it updates or stops it - which would close the user's apps along with us.</summary>
-    private static void Start(string path)
+    /// processes when it updates or stops it - which would close the user's apps along with us.
+    /// Explorer drops arguments given after the path, so an app with arguments is started from a
+    /// shortcut (.lnk) that carries them, one per workspace and app, rewritten on every start.</summary>
+    private void Start(Guid workspaceId, WorkspaceEntry entry)
     {
+        var open = entry.ImagePath;
+        if (entry.Arguments.Length > 0)
+        {
+            open = Path.Combine(_shortcutFolder, $"{workspaceId:N}-{Path.GetFileNameWithoutExtension(entry.App)}.lnk");
+            ShellLink.Write(open, entry.ImagePath, entry.Arguments, Path.GetDirectoryName(entry.ImagePath) ?? string.Empty);
+        }
+
         var explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-        using var process = Process.Start(new ProcessStartInfo(explorer, $"\"{path}\"") { UseShellExecute = false });
+        using var process = Process.Start(new ProcessStartInfo(explorer, $"\"{open}\"") { UseShellExecute = false });
     }
 
     private static void Add(List<string> parts, int count, string what)

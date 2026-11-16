@@ -4,9 +4,10 @@ using System.Linq;
 
 namespace DesktopTiler.Core.Rules;
 
-/// <summary>One app of a workspace: the executable to start (full path) and the desktop its
-/// windows go to, kept by id like a window rule's.</summary>
-public sealed record WorkspaceEntry(string ImagePath, Guid DesktopId)
+/// <summary>One app of a workspace: the executable to start (full path), the desktop its
+/// windows go to (kept by id like a window rule's), and the command-line arguments it's started
+/// with (empty for none).</summary>
+public sealed record WorkspaceEntry(string ImagePath, Guid DesktopId, string Arguments = "")
 {
     /// <summary>The executable's file name, the key windows are matched by.</summary>
     public string App => WindowRules.AppName(ImagePath);
