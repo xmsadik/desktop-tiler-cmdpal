@@ -15,7 +15,9 @@ namespace DesktopTiler;
 /// Clicking an item switches to that desktop. Each item's icon is a filled square if the desktop
 /// has at least one app window on it, an outlined square if it's empty, with a blue ring around
 /// it on the active desktop, whose title is also marked "●" with a bold number (no icon at all
-/// if occupancy couldn't be determined). With a Compact Dock, hovering a button also lists that
+/// if occupancy couldn't be determined). Where the Dock shows no desktop names (Compact size,
+/// labels off, or "Show desktop names" off) the number is drawn inside the square instead and the
+/// title is left empty, so the buttons are icon-only and narrower. With a Compact Dock, hovering a button also lists that
 /// desktop's windows (the subtitle's extra lines, see DesktopWindowGroups.TooltipSubtitle and
 /// DockLayoutProbe); <see cref="WindowEventWatcher"/> keeps it live as windows come and go.
 ///
@@ -34,6 +36,11 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
     private static readonly IconInfo EmptyIcon = DockIcon("empty");
     private static readonly IconInfo OccupiedActiveIcon = DockIcon("occupied-active");
     private static readonly IconInfo EmptyActiveIcon = DockIcon("empty-active");
+
+    // Highest desktop number with a numbered icon (keep in sync with MAX_NUMBER in
+    // scripts/make-dock-icons.py); desktops past it keep the plain icon and a "21" title.
+    private const int MaxNumberedIcon = 20;
+    private static readonly Dictionary<string, IconInfo> NumberedIcons = [];
 
     private readonly VdComClient _vdClient;
     private readonly RegistryDesktopReader _registryReader;
@@ -147,11 +154,19 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
                 var number = i + 1;
                 var isActive = desktop.Id == currentId;
 
+                var onDesktop = windows is not null && windows.TryGetValue(desktop.Id, out var list) ? list : null;
+                var name = _settingsManager.ShowDesktopNames ? desktop.Name : null;
+
+                // Where the Dock shows no desktop names, the number moves into the icon and the
+                // title stays empty: an icon-only button lets the Dock drop the gap between icon
+                // and label, so the band gets narrower.
+                var numbered = windows is not null && number <= MaxNumberedIcon && (windowListInTooltip || !_settingsManager.ShowDesktopNames);
+
                 // The active desktop: blue ring on the icon, plus "●" and a bold number in the
                 // title (the Dock can't style its labels, so bold Unicode digits stand in for a
                 // bold font).
                 var digits = number.ToString(CultureInfo.InvariantCulture);
-                var title = isActive ? "●" + BoldDigits(digits) : digits;
+                var title = numbered ? string.Empty : isActive ? "●" + BoldDigits(digits) : digits;
 
                 // One long-lived item per desktop, updated in place: the Dock keeps the item it
                 // already shows when the band is refreshed and only picks up property changes,
@@ -163,16 +178,22 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
                     _items[desktop.Id] = item;
                 }
 
-                ((SwitchDesktopCommand)item.Command!).Name = $"Desktop {number}";
+                // An empty item title falls back to the command name, which would put "Desktop N"
+                // back on an icon-only button - so a numbered button's command has no name either
+                // (its tooltip still names the desktop, see below).
+                ((SwitchDesktopCommand)item.Command!).Name = numbered ? string.Empty : $"Desktop {number}";
                 item.Title = title;
-                var onDesktop = windows is not null && windows.TryGetValue(desktop.Id, out var list) ? list : null;
-                item.Icon = windows is null ? null : IconFor(onDesktop is not null, isActive);
+                item.Icon = windows is null ? null : numbered ? NumberedIcon(number, onDesktop is not null, isActive) : IconFor(onDesktop is not null, isActive);
 
                 // The subtitle's first line is the label (the desktop name); the window titles on
                 // the lines after it only show up in the hover tooltip (see DesktopWindowGroups).
-                var name = _settingsManager.ShowDesktopNames ? desktop.Name : null;
+                // With no title, that first line also names the desktop, since the tooltip
+                // otherwise wouldn't say which one it is.
+                var header = numbered
+                    ? string.IsNullOrEmpty(name) ? $"Desktop {number}" : $"Desktop {number} · {name}"
+                    : name;
                 item.Subtitle = windowListInTooltip
-                    ? DesktopWindowGroups.TooltipSubtitle(name, onDesktop?.Select(WindowEnumerator.GetTitle).ToArray() ?? [])
+                    ? DesktopWindowGroups.TooltipSubtitle(header, onDesktop?.Select(WindowEnumerator.GetTitle).ToArray() ?? [])
                     : name ?? string.Empty;
                 items[i] = item;
             }
@@ -210,6 +231,27 @@ internal sealed partial class DesktopsPage : ListPage, IDisposable
 
     private static IconInfo DockIcon(string state) =>
         IconHelpers.FromRelativePaths($@"Assets\Dock\desktop-{state}-light.png", $@"Assets\Dock\desktop-{state}-dark.png");
+
+    /// <summary>The square with the desktop number inside, used where the Dock shows no desktop
+    /// names (Assets\Dock\Numbered, generated by scripts/make-dock-icons.py for 1..MaxNumberedIcon).
+    /// Created once per number and state and reused, like the plain icons.</summary>
+    private static IconInfo NumberedIcon(int number, bool occupied, bool active)
+    {
+        var state = (occupied ? "occupied" : "empty") + (active ? "-active" : string.Empty);
+        var key = $"{number}-{state}";
+        lock (NumberedIcons)
+        {
+            if (!NumberedIcons.TryGetValue(key, out var icon))
+            {
+                icon = IconHelpers.FromRelativePaths(
+                    $@"Assets\Dock\Numbered\desktop-{key}-light.png",
+                    $@"Assets\Dock\Numbered\desktop-{key}-dark.png");
+                NumberedIcons[key] = icon;
+            }
+
+            return icon;
+        }
+    }
 
     private void OnRegistryChanged(object? sender, EventArgs e) => Refresh();
 
