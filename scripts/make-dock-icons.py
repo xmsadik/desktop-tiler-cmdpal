@@ -1,8 +1,10 @@
 """Generate the Dock band's per-desktop icons in src/DesktopTiler/Assets/Dock.
 
 Each desktop button shows a square: filled if the desktop has app windows, outlined if it's
-empty. The active desktop's square additionally gets a blue ring around it. Glyph icons can't
-carry a second colour, so these are PNGs, one per state and theme:
+empty. The active desktop's square is drawn in the accent blue instead of the foreground colour
+(an empty one also gets a thicker outline): a thin ring around the square blurred into the
+square's edge at the ~16 px a Compact Dock draws icons at, whereas a coloured square stands out.
+Glyph icons can't carry a colour, so these are PNGs, one per state and theme:
 
     desktop-{occupied|empty}[-active]-{light|dark}.png
 
@@ -43,27 +45,18 @@ def draw(occupied: bool, active: bool, theme: str) -> Image.Image:
     d = ImageDraw.Draw(im)
 
     # The square fills the same share of the icon box as the Segoe Checkbox glyph, so the
-    # buttons keep their size; the ring sits in the margin around it.
+    # buttons keep their size.
     side = w * 0.56
     x0 = (w - side) / 2
     box = [x0, x0, x0 + side, x0 + side]
     radius = w * 0.07
-    stroke = w * 0.065
+    stroke = w * (0.11 if active else 0.065)
+    colour = ACCENT[theme] if active else FOREGROUND[theme]
 
     if occupied:
-        d.rounded_rectangle(box, radius, fill=FOREGROUND[theme])
+        d.rounded_rectangle(box, radius, fill=colour)
     else:
-        d.rounded_rectangle(box, radius, outline=FOREGROUND[theme], width=round(stroke))
-
-    if active:
-        gap, ring = w * 0.05, w * 0.11
-        outer = x0 - gap - ring
-        d.rounded_rectangle(
-            [outer, outer, w - outer, w - outer],
-            radius + gap + ring,
-            outline=ACCENT[theme],
-            width=round(ring),
-        )
+        d.rounded_rectangle(box, radius, outline=colour, width=round(stroke))
 
     return im.resize((SIZE, SIZE), Image.LANCZOS)
 
@@ -74,18 +67,19 @@ def draw_numbered(number: int, occupied: bool, active: bool, theme: str) -> Imag
     im = Image.new("RGBA", (w, w), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
 
-    # A bigger square than the plain icon, so the number stays legible at 16 px; the ring is
-    # thinner and hugs the edge of the icon box.
-    side = w * 0.76
+    # A bigger square than the plain icon, so the number stays legible at 16 px. It now takes
+    # the whole icon box minus a small margin, since there's no ring to leave room for.
+    side = w * 0.84
     x0 = (w - side) / 2
     box = [x0, x0, x0 + side, x0 + side]
-    radius = w * 0.09
-    stroke = w * 0.06
+    radius = w * 0.1
+    stroke = w * (0.09 if active else 0.06)
+    colour = ACCENT[theme] if active else FOREGROUND[theme]
 
     if occupied:
-        d.rounded_rectangle(box, radius, fill=FOREGROUND[theme])
+        d.rounded_rectangle(box, radius, fill=colour)
     else:
-        d.rounded_rectangle(box, radius, outline=FOREGROUND[theme], width=round(stroke))
+        d.rounded_rectangle(box, radius, outline=colour, width=round(stroke))
 
     # The number: as large as fits inside the square's inner area.
     text = str(number)
@@ -107,17 +101,7 @@ def draw_numbered(number: int, occupied: bool, active: bool, theme: str) -> Imag
         alpha.paste(0, mask=mask)
         im.putalpha(alpha)
     else:
-        d.text(pos, text, font=font, fill=FOREGROUND[theme])
-
-    if active:
-        gap, ring = w * 0.035, w * 0.07
-        outer = x0 - gap - ring
-        d.rounded_rectangle(
-            [outer, outer, w - outer, w - outer],
-            radius + gap + ring,
-            outline=ACCENT[theme],
-            width=round(ring),
-        )
+        d.text(pos, text, font=font, fill=colour)
 
     return im.resize((SIZE, SIZE), Image.LANCZOS)
 
