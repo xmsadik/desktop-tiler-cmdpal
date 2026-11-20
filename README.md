@@ -41,7 +41,7 @@ Tiling is **one-shot, not continuous**: nothing is watched or re-tiled automatic
 
 ## Installation
 
-**Microsoft Store:** Desktop Tiler is being submitted to the Microsoft Store; once the listing is live, it will be linked here and installing it there is the easiest way (no certificate, automatic updates). Until then, install it from GitHub as below. Either way, do step 1 first.
+**Microsoft Store (recommended):** [Get Desktop Tiler from the Microsoft Store](https://apps.microsoft.com/detail/9ndt24bz55vk). It is the easiest way: no certificate, automatic updates. Do step 1 below, then install it from the Store; steps 2-4 are only for installing from GitHub instead.
 
 ### 1. Turn on the Dock
 
